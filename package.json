@@ -1,10 +1,16 @@
 {
   "name": "ip2proxy-nodejs",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "IP2Proxy proxy detection component",
   "keywords": [
+    "vpn-detection",
+    "proxy-detection",
+    "anonymous-proxy",
     "ip2proxy",
-    "proxy detection"
+    "proxy-database",
+    "vpn",
+    "tor",
+    "proxy"
   ],
   "homepage": "http://www.ip2location.com/ip2proxy/developers/nodejs",
   "author": {

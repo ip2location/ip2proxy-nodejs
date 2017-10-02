@@ -2,7 +2,9 @@ var net = require("net");
 var fs = require("fs");
 var bigInt = require("big-integer");
 
-var version = "1.0.0";
+var fd;
+
+var version = "1.1.0";
 var binfile = "";
 var IPv4ColumnSize = 0;
 var IPv6ColumnSize = 0;
@@ -68,9 +70,7 @@ var MSG_IPV6_UNSUPPORTED = "IPV6 ADDRESS MISSING IN IPV4 BIN";
 // Read binary data
 function readbin(readbytes, pos, readtype, isbigint) {
 	var buff = new Buffer(readbytes);
-	var fd = fs.openSync(binfile, 'r');
 	totalread = fs.readSync(fd, buff, 0, readbytes, pos);
-	fs.closeSync(fd);
 	
 	if (totalread == readbytes) {
 		switch (readtype) {
@@ -190,6 +190,8 @@ function loadbin() {
 	
 	try {
 		if (binfile && (binfile != "")) {
+			fd = fs.openSync(binfile, 'r');
+			
 			mydb._DBType = read8(1);
 			mydb._DBColumn = read8(2);
 			mydb._DBYear = read8(3);

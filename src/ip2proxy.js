@@ -90,7 +90,7 @@ var MSG_IPV6_UNSUPPORTED = "IPV6 ADDRESS MISSING IN IPV4 BIN";
 
 // Read binary data
 function readbin(readbytes, pos, readtype, isbigint) {
-	var buff = new Buffer(readbytes);
+	var buff = new Buffer.alloc(readbytes);
 	totalread = fs.readSync(fd, buff, 0, readbytes, pos);
 	
 	if (totalread == readbytes) {

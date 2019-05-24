@@ -4,7 +4,7 @@ var bigInt = require("big-integer");
 
 var fd;
 
-var version = "1.1.0";
+var version = "2.0.0";
 var binfile = "";
 var IPv4ColumnSize = 0;
 var IPv6ColumnSize = 0;
@@ -16,23 +16,39 @@ var maxindex = 65536;
 var IndexArrayIPv4 = Array(maxindex);
 var IndexArrayIPv6 = Array(maxindex);
 
-var country_pos = [0, 2, 3, 3, 3];
-var region_pos = [0, 0, 0, 4, 4];
-var city_pos = [0, 0, 0, 5, 5];
-var isp_pos = [0, 0, 0, 0, 6];
-var proxytype_pos = [0, 0, 2, 2, 2];
+var country_pos = [0, 2, 3, 3, 3, 3, 3, 3, 3];
+var region_pos = [0, 0, 0, 4, 4, 4, 4, 4, 4];
+var city_pos = [0, 0, 0, 5, 5, 5, 5, 5, 5];
+var isp_pos = [0, 0, 0, 0, 6, 6, 6, 6, 6];
+var proxytype_pos = [0, 0, 2, 2, 2, 2, 2, 2, 2];
+var domain_pos = [0, 0, 0, 0, 0, 7, 7, 7, 7];
+var usagetype_pos = [0, 0, 0, 0, 0, 0, 8, 8, 8];
+var asn_pos = [0, 0, 0, 0, 0, 0, 0, 9, 9];
+var as_pos = [0, 0, 0, 0, 0, 0, 0, 10, 10];
+var lastseen_pos = [0, 0, 0, 0, 0, 0, 0, 0, 11];
+
 
 var country_pos_offset = 0;
 var region_pos_offset = 0;
 var city_pos_offset = 0;
 var isp_pos_offset = 0;
 var proxytype_pos_offset = 0;
+var domain_pos_offset = 0;
+var usagetype_pos_offset = 0;
+var asn_pos_offset = 0;
+var as_pos_offset = 0;
+var lastseen_pos_offset = 0;
 
 var country_enabled = 0;
 var region_enabled = 0;
 var city_enabled = 0;
 var isp_enabled = 0;
 var proxytype_enabled = 0;
+var domain_enabled = 0;
+var usagetype_enabled = 0;
+var asn_enabled = 0;
+var as_enabled = 0;
+var lastseen_enabled = 0;
 
 var MAX_IPV4_RANGE = bigInt(4294967295);
 var MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
@@ -59,6 +75,11 @@ var modes = {
 	"ISP": 5,
 	"PROXY_TYPE": 6,
 	"IS_PROXY": 7,
+	"DOMAIN": 8,
+	"USAGE_TYPE": 9,
+	"ASN": 10,
+	"AS": 11,
+	"LAST_SEEN": 12,
 	"ALL": 100
 };
 
@@ -215,12 +236,22 @@ function loadbin() {
 			city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 1) << 2 : 0;
 			isp_pos_offset = (isp_pos[dbt] != 0) ? (isp_pos[dbt] - 1) << 2 : 0;
 			proxytype_pos_offset = (proxytype_pos[dbt] != 0) ? (proxytype_pos[dbt] - 1) << 2 : 0;
+			domain_pos_offset = (domain_pos[dbt] != 0) ? (domain_pos[dbt] - 1) << 2 : 0;
+			usagetype_pos_offset = (usagetype_pos[dbt] != 0) ? (usagetype_pos[dbt] - 1) << 2 : 0;
+			asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 1) << 2 : 0;
+			as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 1) << 2 : 0;
+			lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 1) << 2 : 0;
 			
 			country_enabled = (country_pos[dbt] != 0) ? 1 : 0;
 			region_enabled = (region_pos[dbt] != 0) ? 1 : 0;
 			city_enabled = (city_pos[dbt] != 0) ? 1 : 0;
 			isp_enabled = (isp_pos[dbt] != 0) ? 1 : 0;
 			proxytype_enabled = (proxytype_pos[dbt] != 0) ? 1 : 0;
+			domain_enabled = (domain_pos[dbt] != 0) ? 1 : 0;
+			usagetype_enabled = (usagetype_pos[dbt] != 0) ? 1 : 0;
+			asn_enabled = (asn_pos[dbt] != 0) ? 1 : 0;
+			as_enabled = (as_pos[dbt] != 0) ? 1 : 0;
+			lastseen_enabled = (lastseen_pos[dbt] != 0) ? 1 : 0;
 			
 			var pointer = mydb._IndexBaseAddr;
 			
@@ -387,12 +418,37 @@ function proxyquery_data(myIP, iptype, data, mode) {
 					data.ISP = readstr(read32(rowoffset + isp_pos_offset));
 				}
 			}
+			if (domain_enabled) {
+				if (mode == modes.ALL || mode == modes.DOMAIN) {
+					data.Domain = readstr(read32(rowoffset + domain_pos_offset));
+				}
+			}
+			if (usagetype_enabled) {
+				if (mode == modes.ALL || mode == modes.USAGE_TYPE) {
+					data.Usage_Type = readstr(read32(rowoffset + usagetype_pos_offset));
+				}
+			}
+			if (asn_enabled) {
+				if (mode == modes.ALL || mode == modes.ASN) {
+					data.ASN = readstr(read32(rowoffset + asn_pos_offset));
+				}
+			}
+			if (as_enabled) {
+				if (mode == modes.ALL || mode == modes.AS) {
+					data.AS = readstr(read32(rowoffset + as_pos_offset));
+				}
+			}
+			if (lastseen_enabled) {
+				if (mode == modes.ALL || mode == modes.LAST_SEEN) {
+					data.Last_Seen = readstr(read32(rowoffset + lastseen_pos_offset));
+				}
+			}
 			
 			if (data.Country_Short == "-" || data.Proxy_Type == "-") {
 				data.Is_Proxy = 0;
 			}
 			else {
-				if (data.Proxy_Type == "DCH") {
+				if ((data.Proxy_Type == "DCH") || (data.Proxy_Type == "SES")) {
 					data.Is_Proxy = 2;
 				}
 				else {
@@ -423,7 +479,12 @@ function proxyquery(myIP, mode) {
 		"Country_Long": "?",
 		"Region": "?",
 		"City": "?",
-		"ISP": "?"
+		"ISP": "?",
+		"Domain": "?",
+		"Usage_Type": "?",
+		"ASN": "?",
+		"AS": "?",
+		"Last_Seen": "?"
 	};
 	
 	if (/^[:0]+:F{4}:(\d+\.){3}\d+$/i.test(myIP)) {
@@ -476,8 +537,8 @@ exports.getDatabaseVersion = function getDatabaseVersion() {
 exports.isProxy = function isProxy(myIP) {
 	// -1 is error
 	// 0 is not a proxy
-	// 1 is proxy except DCH
-	// 2 is proxy and DCH
+	// 1 is proxy except DCH and SES
+	// 2 is proxy and DCH or SES
 	data = proxyquery(myIP, modes.IS_PROXY);
 	return data.Is_Proxy;
 }
@@ -516,6 +577,36 @@ exports.getISP = function getISP(myIP) {
 exports.getProxyType = function getProxyType(myIP) {
 	data = proxyquery(myIP, modes.PROXY_TYPE);
 	return data.Proxy_Type;
+}
+
+// Returns a string for the domain
+exports.getDomain = function getDomain(myIP) {
+	data = proxyquery(myIP, modes.DOMAIN);
+	return data.Domain;
+}
+
+// Returns a string for the usage type
+exports.getUsageType = function getUsageType(myIP) {
+	data = proxyquery(myIP, modes.USAGE_TYPE);
+	return data.Usage_Type;
+}
+
+// Returns a string for the ASN
+exports.getASN = function getASN(myIP) {
+	data = proxyquery(myIP, modes.ASN);
+	return data.ASN;
+}
+
+// Returns a string for the AS
+exports.getAS = function getAS(myIP) {
+	data = proxyquery(myIP, modes.AS);
+	return data.AS;
+}
+
+// Returns a string for the last seen
+exports.getLastSeen = function getLastSeen(myIP) {
+	data = proxyquery(myIP, modes.LAST_SEEN);
+	return data.Last_Seen;
 }
 
 // Returns all results

@@ -1,0 +1,27 @@
+{
+  "name": "ip2proxy-nodejs",
+  "description": "This Node.js module provides a fast lookup of proxy information from IP address by using IP2Proxy BIN database.",
+  "main": "src/ip2proxy.js",
+  "keywords": [
+    "vpn-detection",
+    "proxy-detection",
+    "anonymous-proxy",
+    "ip2proxy",
+    "proxy-database",
+    "vpn",
+    "tor",
+    "proxy"
+  ],
+  "authors": [
+    "IP2Location.com <sales@ip2location.com> (https://www.ip2location.com/)"
+  ],
+  "license": "MIT",
+  "homepage": "https://www.ip2location.com/",
+  "dependencies": {
+    "big-integer": ">=1.6.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ip2location/ip2proxy-nodejs"
+  }
+}

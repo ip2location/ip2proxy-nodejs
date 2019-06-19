@@ -22,6 +22,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/ip2location/ip2proxy-nodejs"
+    "url": "git://github.com/ip2location/ip2proxy-nodejs.git"
   }
 }

@@ -4,7 +4,7 @@ var bigInt = require("big-integer");
 
 var fd;
 
-var version = "2.0.0";
+var version = "2.1.0";
 var binfile = "";
 var IPv4ColumnSize = 0;
 var IPv6ColumnSize = 0;
@@ -52,6 +52,11 @@ var lastseen_enabled = 0;
 
 var MAX_IPV4_RANGE = bigInt(4294967295);
 var MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
+var FROM_6TO4 = bigInt("42545680458834377588178886921629466624");
+var TO_6TO4 = bigInt("42550872755692912415807417417958686719");
+var FROM_TEREDO = bigInt("42540488161975842760550356425300246528");
+var TO_TEREDO = bigInt("42540488241204005274814694018844196863");
+var LAST_32BITS = bigInt("4294967295");
 
 var mydb = {
 	"_DBType": 0,
@@ -352,9 +357,28 @@ function proxyquery_data(myIP, iptype, data, mode) {
 		_ColumnSize = IPv6ColumnSize;
 		ipnum = ip2no(myIP);
 		
-		indexaddr = ipnum.shiftRight(112).toJSNumber();
-		low = IndexArrayIPv6[indexaddr][0];
-		high = IndexArrayIPv6[indexaddr][1];
+		if ((ipnum.geq(FROM_6TO4) && ipnum.leq(TO_6TO4)) || (ipnum.geq(FROM_TEREDO) && ipnum.leq(TO_TEREDO))) {
+			iptype = 4;
+			MAX_IP_RANGE = MAX_IPV4_RANGE;
+			high = mydb._DBCount;
+			_BaseAddr = mydb._BaseAddr;
+			_ColumnSize = IPv4ColumnSize;
+			
+			if (ipnum.geq(FROM_6TO4) && ipnum.leq(TO_6TO4)) {
+				ipnum = ipnum.shiftRight(80).and(LAST_32BITS).toJSNumber();
+			}
+			else {
+				ipnum = ipnum.not().and(LAST_32BITS).toJSNumber();
+			}
+			indexaddr = ipnum >>> 16;
+			low = IndexArrayIPv4[indexaddr][0];
+			high = IndexArrayIPv4[indexaddr][1];
+		}
+		else {
+			indexaddr = ipnum.shiftRight(112).toJSNumber();
+			low = IndexArrayIPv6[indexaddr][0];
+			high = IndexArrayIPv6[indexaddr][1];
+		}
 	}
 	
 	data.IP = myIP;

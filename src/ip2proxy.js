@@ -4,7 +4,7 @@ var bigInt = require("big-integer");
 
 var fd;
 
-var version = "2.1.0";
+var version = "2.2.0";
 var binfile = "";
 var IPv4ColumnSize = 0;
 var IPv6ColumnSize = 0;
@@ -93,6 +93,13 @@ var MSG_INVALID_IP = "INVALID IP ADDRESS";
 var MSG_MISSING_FILE = "MISSING FILE";
 var MSG_IPV6_UNSUPPORTED = "IPV6 ADDRESS MISSING IN IPV4 BIN";
 
+// Read row data
+function readrow(readbytes, pos) {
+	var buff = new Buffer.alloc(readbytes);
+	totalread = fs.readSync(fd, buff, 0, readbytes, pos - 1);
+	return buff;
+}
+
 // Read binary data
 function readbin(readbytes, pos, readtype, isbigint) {
 	var buff = new Buffer.alloc(readbytes);
@@ -142,10 +149,20 @@ function read32(pos, isbigint) {
 	return readbin(readbytes, pos - 1, "uint32", isbigint);
 }
 
+// Read 32 bits integer in the buffer
+function read32_row(pos, buff) {
+	return buff.readUInt32LE(pos);
+}
+
 // Read 32 bits float in the database
 function readfloat(pos) {
 	readbytes = 4;
 	return readbin(readbytes, pos - 1, "float");
+}
+
+// Read 32 bits float in the buffer
+function readfloat_row(pos, buff) {
+	return buff.readFloatLE(pos);
 }
 
 function read32or128(pos, iptype) {
@@ -236,16 +253,28 @@ function loadbin() {
 			var dbt = mydb._DBType;
 			
 			// since both IPv4 and IPv6 use 4 bytes for the below columns, can just do it once here
-			country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 1) << 2 : 0;
-			region_pos_offset = (region_pos[dbt] != 0) ? (region_pos[dbt] - 1) << 2 : 0;
-			city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 1) << 2 : 0;
-			isp_pos_offset = (isp_pos[dbt] != 0) ? (isp_pos[dbt] - 1) << 2 : 0;
-			proxytype_pos_offset = (proxytype_pos[dbt] != 0) ? (proxytype_pos[dbt] - 1) << 2 : 0;
-			domain_pos_offset = (domain_pos[dbt] != 0) ? (domain_pos[dbt] - 1) << 2 : 0;
-			usagetype_pos_offset = (usagetype_pos[dbt] != 0) ? (usagetype_pos[dbt] - 1) << 2 : 0;
-			asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 1) << 2 : 0;
-			as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 1) << 2 : 0;
-			lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 1) << 2 : 0;
+			// country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 1) << 2 : 0;
+			// region_pos_offset = (region_pos[dbt] != 0) ? (region_pos[dbt] - 1) << 2 : 0;
+			// city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 1) << 2 : 0;
+			// isp_pos_offset = (isp_pos[dbt] != 0) ? (isp_pos[dbt] - 1) << 2 : 0;
+			// proxytype_pos_offset = (proxytype_pos[dbt] != 0) ? (proxytype_pos[dbt] - 1) << 2 : 0;
+			// domain_pos_offset = (domain_pos[dbt] != 0) ? (domain_pos[dbt] - 1) << 2 : 0;
+			// usagetype_pos_offset = (usagetype_pos[dbt] != 0) ? (usagetype_pos[dbt] - 1) << 2 : 0;
+			// asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 1) << 2 : 0;
+			// as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 1) << 2 : 0;
+			// lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 1) << 2 : 0;
+			
+			// slightly different offset for reading by row
+			country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 2) << 2 : 0;
+			region_pos_offset = (region_pos[dbt] != 0) ? (region_pos[dbt] - 2) << 2 : 0;
+			city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 2) << 2 : 0;
+			isp_pos_offset = (isp_pos[dbt] != 0) ? (isp_pos[dbt] - 2) << 2 : 0;
+			proxytype_pos_offset = (proxytype_pos[dbt] != 0) ? (proxytype_pos[dbt] - 2) << 2 : 0;
+			domain_pos_offset = (domain_pos[dbt] != 0) ? (domain_pos[dbt] - 2) << 2 : 0;
+			usagetype_pos_offset = (usagetype_pos[dbt] != 0) ? (usagetype_pos[dbt] - 2) << 2 : 0;
+			asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 2) << 2 : 0;
+			as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 2) << 2 : 0;
+			lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 2) << 2 : 0;
 			
 			country_enabled = (country_pos[dbt] != 0) ? 1 : 0;
 			region_enabled = (region_pos[dbt] != 0) ? 1 : 0;
@@ -404,19 +433,25 @@ function proxyquery_data(myIP, iptype, data, mode) {
 		if (ipfrom.leq(ipnum) && ipto.gt(ipnum)) {
 			loadmesg(data, MSG_NOT_SUPPORTED); // load default message
 			
+			var firstcol = 4;
 			if (iptype == 6) { // IPv6
-				rowoffset = rowoffset + 12; // coz below is assuming all columns are 4 bytes, so got 12 left to go to make 16 bytes total
+				firstcol = 16;
+				// rowoffset = rowoffset + 12; // coz below is assuming all columns are 4 bytes, so got 12 left to go to make 16 bytes total
 			}
+			
+			var row = readrow(_ColumnSize - firstcol, rowoffset + firstcol);
 			
 			if (proxytype_enabled) {
 				if (mode == modes.ALL || mode == modes.PROXY_TYPE || mode == modes.IS_PROXY) {
-					data.Proxy_Type = readstr(read32(rowoffset + proxytype_pos_offset));
+					// data.Proxy_Type = readstr(read32(rowoffset + proxytype_pos_offset));
+					data.Proxy_Type = readstr(read32_row(proxytype_pos_offset, row));
 				}
 			}
 			
 			if (country_enabled) {
 				if (mode == modes.ALL || mode == modes.COUNTRY_SHORT || mode == modes.COUNTRY_LONG || mode == modes.IS_PROXY) {
-					countrypos = read32(rowoffset + country_pos_offset);
+					// countrypos = read32(rowoffset + country_pos_offset);
+					countrypos = read32_row(country_pos_offset, row);
 				}
 				if (mode == modes.ALL || mode == modes.COUNTRY_SHORT || mode == modes.IS_PROXY) {
 					data.Country_Short = readstr(countrypos);
@@ -428,43 +463,51 @@ function proxyquery_data(myIP, iptype, data, mode) {
 			
 			if (region_enabled) {
 				if (mode == modes.ALL || mode == modes.REGION) {
-					data.Region = readstr(read32(rowoffset + region_pos_offset));
+					// data.Region = readstr(read32(rowoffset + region_pos_offset));
+					data.Region = readstr(read32_row(region_pos_offset, row));
 				}
 			}
 			
 			if (city_enabled) {
 				if (mode == modes.ALL || mode == modes.CITY) {
-					data.City = readstr(read32(rowoffset + city_pos_offset));
+					// data.City = readstr(read32(rowoffset + city_pos_offset));
+					data.City = readstr(read32_row(city_pos_offset, row));
 				}
 			}
 			if (isp_enabled) {
 				if (mode == modes.ALL || mode == modes.ISP) {
-					data.ISP = readstr(read32(rowoffset + isp_pos_offset));
+					// data.ISP = readstr(read32(rowoffset + isp_pos_offset));
+					data.ISP = readstr(read32_row(isp_pos_offset, row));
 				}
 			}
 			if (domain_enabled) {
 				if (mode == modes.ALL || mode == modes.DOMAIN) {
-					data.Domain = readstr(read32(rowoffset + domain_pos_offset));
+					// data.Domain = readstr(read32(rowoffset + domain_pos_offset));
+					data.Domain = readstr(read32_row(domain_pos_offset, row));
 				}
 			}
 			if (usagetype_enabled) {
 				if (mode == modes.ALL || mode == modes.USAGE_TYPE) {
-					data.Usage_Type = readstr(read32(rowoffset + usagetype_pos_offset));
+					// data.Usage_Type = readstr(read32(rowoffset + usagetype_pos_offset));
+					data.Usage_Type = readstr(read32_row(usagetype_pos_offset, row));
 				}
 			}
 			if (asn_enabled) {
 				if (mode == modes.ALL || mode == modes.ASN) {
-					data.ASN = readstr(read32(rowoffset + asn_pos_offset));
+					// data.ASN = readstr(read32(rowoffset + asn_pos_offset));
+					data.ASN = readstr(read32_row(asn_pos_offset, row));
 				}
 			}
 			if (as_enabled) {
 				if (mode == modes.ALL || mode == modes.AS) {
-					data.AS = readstr(read32(rowoffset + as_pos_offset));
+					// data.AS = readstr(read32(rowoffset + as_pos_offset));
+					data.AS = readstr(read32_row(as_pos_offset, row));
 				}
 			}
 			if (lastseen_enabled) {
 				if (mode == modes.ALL || mode == modes.LAST_SEEN) {
-					data.Last_Seen = readstr(read32(rowoffset + lastseen_pos_offset));
+					// data.Last_Seen = readstr(read32(rowoffset + lastseen_pos_offset));
+					data.Last_Seen = readstr(read32_row(lastseen_pos_offset, row));
 				}
 			}
 			

@@ -4,7 +4,7 @@ var bigInt = require("big-integer");
 
 var fd;
 
-var version = "2.2.0";
+var version = "2.3.0";
 var binfile = "";
 var IPv4ColumnSize = 0;
 var IPv6ColumnSize = 0;
@@ -16,17 +16,17 @@ var maxindex = 65536;
 var IndexArrayIPv4 = Array(maxindex);
 var IndexArrayIPv6 = Array(maxindex);
 
-var country_pos = [0, 2, 3, 3, 3, 3, 3, 3, 3];
-var region_pos = [0, 0, 0, 4, 4, 4, 4, 4, 4];
-var city_pos = [0, 0, 0, 5, 5, 5, 5, 5, 5];
-var isp_pos = [0, 0, 0, 0, 6, 6, 6, 6, 6];
-var proxytype_pos = [0, 0, 2, 2, 2, 2, 2, 2, 2];
-var domain_pos = [0, 0, 0, 0, 0, 7, 7, 7, 7];
-var usagetype_pos = [0, 0, 0, 0, 0, 0, 8, 8, 8];
-var asn_pos = [0, 0, 0, 0, 0, 0, 0, 9, 9];
-var as_pos = [0, 0, 0, 0, 0, 0, 0, 10, 10];
-var lastseen_pos = [0, 0, 0, 0, 0, 0, 0, 0, 11];
-
+var country_pos = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+var region_pos = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4];
+var city_pos = [0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5];
+var isp_pos = [0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6];
+var proxytype_pos = [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+var domain_pos = [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7];
+var usagetype_pos = [0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8];
+var asn_pos = [0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9];
+var as_pos = [0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10];
+var lastseen_pos = [0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11];
+var threat_pos = [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12];
 
 var country_pos_offset = 0;
 var region_pos_offset = 0;
@@ -38,6 +38,7 @@ var usagetype_pos_offset = 0;
 var asn_pos_offset = 0;
 var as_pos_offset = 0;
 var lastseen_pos_offset = 0;
+var threat_pos_offset = 0;
 
 var country_enabled = 0;
 var region_enabled = 0;
@@ -49,6 +50,7 @@ var usagetype_enabled = 0;
 var asn_enabled = 0;
 var as_enabled = 0;
 var lastseen_enabled = 0;
+var threat_enabled = 0;
 
 var MAX_IPV4_RANGE = bigInt(4294967295);
 var MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
@@ -85,6 +87,7 @@ var modes = {
 	"ASN": 10,
 	"AS": 11,
 	"LAST_SEEN": 12,
+	"THREAT": 13,
 	"ALL": 100
 };
 
@@ -263,6 +266,7 @@ function loadbin() {
 			// asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 1) << 2 : 0;
 			// as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 1) << 2 : 0;
 			// lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 1) << 2 : 0;
+			// threat_pos_offset = (threat_pos[dbt] != 0) ? (threat_pos[dbt] - 1) << 2 : 0;
 			
 			// slightly different offset for reading by row
 			country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 2) << 2 : 0;
@@ -275,6 +279,7 @@ function loadbin() {
 			asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 2) << 2 : 0;
 			as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 2) << 2 : 0;
 			lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 2) << 2 : 0;
+			threat_pos_offset = (threat_pos[dbt] != 0) ? (threat_pos[dbt] - 2) << 2 : 0;
 			
 			country_enabled = (country_pos[dbt] != 0) ? 1 : 0;
 			region_enabled = (region_pos[dbt] != 0) ? 1 : 0;
@@ -286,6 +291,7 @@ function loadbin() {
 			asn_enabled = (asn_pos[dbt] != 0) ? 1 : 0;
 			as_enabled = (as_pos[dbt] != 0) ? 1 : 0;
 			lastseen_enabled = (lastseen_pos[dbt] != 0) ? 1 : 0;
+			threat_enabled = (threat_pos[dbt] != 0) ? 1 : 0;
 			
 			var pointer = mydb._IndexBaseAddr;
 			
@@ -510,6 +516,12 @@ function proxyquery_data(myIP, iptype, data, mode) {
 					data.Last_Seen = readstr(read32_row(lastseen_pos_offset, row));
 				}
 			}
+			if (threat_enabled) {
+				if (mode == modes.ALL || mode == modes.THREAT) {
+					// data.Threat = readstr(read32(rowoffset + threat_pos_offset));
+					data.Threat = readstr(read32_row(threat_pos_offset, row));
+				}
+			}
 			
 			if (data.Country_Short == "-" || data.Proxy_Type == "-") {
 				data.Is_Proxy = 0;
@@ -551,7 +563,8 @@ function proxyquery(myIP, mode) {
 		"Usage_Type": "?",
 		"ASN": "?",
 		"AS": "?",
-		"Last_Seen": "?"
+		"Last_Seen": "?",
+		"Threat": "?"
 	};
 	
 	if (/^[:0]+:F{4}:(\d+\.){3}\d+$/i.test(myIP)) {
@@ -674,6 +687,12 @@ exports.getAS = function getAS(myIP) {
 exports.getLastSeen = function getLastSeen(myIP) {
 	data = proxyquery(myIP, modes.LAST_SEEN);
 	return data.Last_Seen;
+}
+
+// Returns a string for the threat
+exports.getThreat = function getThreat(myIP) {
+	data = proxyquery(myIP, modes.THREAT);
+	return data.Threat;
 }
 
 // Returns all results

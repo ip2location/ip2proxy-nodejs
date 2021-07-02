@@ -1,7 +1,7 @@
 // var ip2proxy = require("./ip2proxy.js");
 var ip2proxy = require("ip2proxy-nodejs");
 
-ip2proxy.Open("PX10.BIN");
+ip2proxy.Open("PX11.BIN");
 
 testip = ['8.8.8.8', '199.83.103.79'];
 

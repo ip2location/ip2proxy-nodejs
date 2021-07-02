@@ -4,7 +4,7 @@ var bigInt = require("big-integer");
 
 var fd;
 
-var version = "3.0.0";
+var version = "3.1.0";
 var binfile = "";
 var IPv4ColumnSize = 0;
 var IPv6ColumnSize = 0;
@@ -16,17 +16,18 @@ var maxindex = 65536;
 var IndexArrayIPv4 = Array(maxindex);
 var IndexArrayIPv6 = Array(maxindex);
 
-var country_pos = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3];
-var region_pos = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4];
-var city_pos = [0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5];
-var isp_pos = [0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6];
-var proxytype_pos = [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2];
-var domain_pos = [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7];
-var usagetype_pos = [0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8];
-var asn_pos = [0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9];
-var as_pos = [0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10];
-var lastseen_pos = [0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11];
-var threat_pos = [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12];
+var country_pos = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+var region_pos = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
+var city_pos = [0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5];
+var isp_pos = [0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6];
+var proxytype_pos = [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+var domain_pos = [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7];
+var usagetype_pos = [0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8];
+var asn_pos = [0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9];
+var as_pos = [0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10];
+var lastseen_pos = [0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11];
+var threat_pos = [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12];
+var provider_pos = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13];
 
 var country_pos_offset = 0;
 var region_pos_offset = 0;
@@ -39,6 +40,7 @@ var asn_pos_offset = 0;
 var as_pos_offset = 0;
 var lastseen_pos_offset = 0;
 var threat_pos_offset = 0;
+var provider_pos_offset = 0;
 
 var country_enabled = 0;
 var region_enabled = 0;
@@ -51,6 +53,7 @@ var asn_enabled = 0;
 var as_enabled = 0;
 var lastseen_enabled = 0;
 var threat_enabled = 0;
+var provider_enabled = 0;
 
 var MAX_IPV4_RANGE = bigInt(4294967295);
 var MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
@@ -71,7 +74,10 @@ var mydb = {
 	"_DBCountIPv6": 0,
 	"_BaseAddrIPv6": 0,
 	"_IndexBaseAddr": 0,
-	"_IndexBaseAddrIPv6": 0
+	"_IndexBaseAddrIPv6": 0,
+	"_ProductCode": 0,
+	"_ProductType": 0,
+	"_FileSize": 0
 };
 
 var modes = {
@@ -88,6 +94,7 @@ var modes = {
 	"AS": 11,
 	"LAST_SEEN": 12,
 	"THREAT": 13,
+	"PROVIDER": 14,
 	"ALL": 100
 };
 
@@ -95,6 +102,7 @@ var MSG_NOT_SUPPORTED = "NOT SUPPORTED";
 var MSG_INVALID_IP = "INVALID IP ADDRESS";
 var MSG_MISSING_FILE = "MISSING FILE";
 var MSG_IPV6_UNSUPPORTED = "IPV6 ADDRESS MISSING IN IPV4 BIN";
+var MSG_INVALID_BIN = "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file.";
 
 // Read row data
 function readrow(readbytes, pos) {
@@ -249,26 +257,21 @@ function loadbin() {
 			mydb._BaseAddrIPv6 = read32(18);
 			mydb._IndexBaseAddr = read32(22);
 			mydb._IndexBaseAddrIPv6 = read32(26);
+			mydb._ProductCode = read8(30);
+			// below 2 fields just read for now, not being used yet
+			mydb._ProductType = read8(31);
+			mydb._FileSize = read32(32);
+			
+			// check if is correct BIN (should be 2 for IP2Proxy BIN file), also checking for zipped file (PK being the first 2 chars)
+			if ((mydb._ProductCode != 2 && mydb._DBYear >= 21) || (mydb._DBType == 80 && mydb._DBColumn == 75)) { // only BINs from Jan 2021 onwards have this byte set
+				throw new Error(MSG_INVALID_BIN);
+			}
 			
 			IPv4ColumnSize = mydb._DBColumn << 2; // 4 bytes each column
 			IPv6ColumnSize = 16 + ((mydb._DBColumn - 1) << 2); // 4 bytes each column, except IPFrom column which is 16 bytes
 			
 			var dbt = mydb._DBType;
 			
-			// since both IPv4 and IPv6 use 4 bytes for the below columns, can just do it once here
-			// country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 1) << 2 : 0;
-			// region_pos_offset = (region_pos[dbt] != 0) ? (region_pos[dbt] - 1) << 2 : 0;
-			// city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 1) << 2 : 0;
-			// isp_pos_offset = (isp_pos[dbt] != 0) ? (isp_pos[dbt] - 1) << 2 : 0;
-			// proxytype_pos_offset = (proxytype_pos[dbt] != 0) ? (proxytype_pos[dbt] - 1) << 2 : 0;
-			// domain_pos_offset = (domain_pos[dbt] != 0) ? (domain_pos[dbt] - 1) << 2 : 0;
-			// usagetype_pos_offset = (usagetype_pos[dbt] != 0) ? (usagetype_pos[dbt] - 1) << 2 : 0;
-			// asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 1) << 2 : 0;
-			// as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 1) << 2 : 0;
-			// lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 1) << 2 : 0;
-			// threat_pos_offset = (threat_pos[dbt] != 0) ? (threat_pos[dbt] - 1) << 2 : 0;
-			
-			// slightly different offset for reading by row
 			country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 2) << 2 : 0;
 			region_pos_offset = (region_pos[dbt] != 0) ? (region_pos[dbt] - 2) << 2 : 0;
 			city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 2) << 2 : 0;
@@ -280,6 +283,7 @@ function loadbin() {
 			as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 2) << 2 : 0;
 			lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 2) << 2 : 0;
 			threat_pos_offset = (threat_pos[dbt] != 0) ? (threat_pos[dbt] - 2) << 2 : 0;
+			provider_pos_offset = (provider_pos[dbt] != 0) ? (provider_pos[dbt] - 2) << 2 : 0;
 			
 			country_enabled = (country_pos[dbt] != 0) ? 1 : 0;
 			region_enabled = (region_pos[dbt] != 0) ? 1 : 0;
@@ -292,6 +296,7 @@ function loadbin() {
 			as_enabled = (as_pos[dbt] != 0) ? 1 : 0;
 			lastseen_enabled = (lastseen_pos[dbt] != 0) ? 1 : 0;
 			threat_enabled = (threat_pos[dbt] != 0) ? 1 : 0;
+			provider_enabled = (provider_pos[dbt] != 0) ? 1 : 0;
 			
 			var pointer = mydb._IndexBaseAddr;
 			
@@ -350,6 +355,9 @@ exports.Close = function Close() {
 		mydb._DBCountIPv6 = 0;
 		mydb._IndexBaseAddr = 0;
 		mydb._IndexBaseAddrIPv6 = 0;
+		mydb._ProductCode = 0;
+		mydb._ProductType = 0;
+		mydb._FileSize = 0;
 		return 0;
 	}
 	catch(err) {
@@ -366,8 +374,6 @@ function loadmesg(data, mesg) {
 }
 
 function proxyquery_data(myIP, iptype, data, mode) {
-	_DBType = mydb._DBType;
-	_DBColumn = mydb._DBColumn;
 	low = 0;
 	mid = 0;
 	high = 0;
@@ -442,21 +448,18 @@ function proxyquery_data(myIP, iptype, data, mode) {
 			var firstcol = 4;
 			if (iptype == 6) { // IPv6
 				firstcol = 16;
-				// rowoffset = rowoffset + 12; // coz below is assuming all columns are 4 bytes, so got 12 left to go to make 16 bytes total
 			}
 			
 			var row = readrow(_ColumnSize - firstcol, rowoffset + firstcol);
 			
 			if (proxytype_enabled) {
 				if (mode == modes.ALL || mode == modes.PROXY_TYPE || mode == modes.IS_PROXY) {
-					// data.Proxy_Type = readstr(read32(rowoffset + proxytype_pos_offset));
 					data.Proxy_Type = readstr(read32_row(proxytype_pos_offset, row));
 				}
 			}
 			
 			if (country_enabled) {
 				if (mode == modes.ALL || mode == modes.COUNTRY_SHORT || mode == modes.COUNTRY_LONG || mode == modes.IS_PROXY) {
-					// countrypos = read32(rowoffset + country_pos_offset);
 					countrypos = read32_row(country_pos_offset, row);
 				}
 				if (mode == modes.ALL || mode == modes.COUNTRY_SHORT || mode == modes.IS_PROXY) {
@@ -469,57 +472,53 @@ function proxyquery_data(myIP, iptype, data, mode) {
 			
 			if (region_enabled) {
 				if (mode == modes.ALL || mode == modes.REGION) {
-					// data.Region = readstr(read32(rowoffset + region_pos_offset));
 					data.Region = readstr(read32_row(region_pos_offset, row));
 				}
 			}
 			
 			if (city_enabled) {
 				if (mode == modes.ALL || mode == modes.CITY) {
-					// data.City = readstr(read32(rowoffset + city_pos_offset));
 					data.City = readstr(read32_row(city_pos_offset, row));
 				}
 			}
 			if (isp_enabled) {
 				if (mode == modes.ALL || mode == modes.ISP) {
-					// data.ISP = readstr(read32(rowoffset + isp_pos_offset));
 					data.ISP = readstr(read32_row(isp_pos_offset, row));
 				}
 			}
 			if (domain_enabled) {
 				if (mode == modes.ALL || mode == modes.DOMAIN) {
-					// data.Domain = readstr(read32(rowoffset + domain_pos_offset));
 					data.Domain = readstr(read32_row(domain_pos_offset, row));
 				}
 			}
 			if (usagetype_enabled) {
 				if (mode == modes.ALL || mode == modes.USAGE_TYPE) {
-					// data.Usage_Type = readstr(read32(rowoffset + usagetype_pos_offset));
 					data.Usage_Type = readstr(read32_row(usagetype_pos_offset, row));
 				}
 			}
 			if (asn_enabled) {
 				if (mode == modes.ALL || mode == modes.ASN) {
-					// data.ASN = readstr(read32(rowoffset + asn_pos_offset));
 					data.ASN = readstr(read32_row(asn_pos_offset, row));
 				}
 			}
 			if (as_enabled) {
 				if (mode == modes.ALL || mode == modes.AS) {
-					// data.AS = readstr(read32(rowoffset + as_pos_offset));
 					data.AS = readstr(read32_row(as_pos_offset, row));
 				}
 			}
 			if (lastseen_enabled) {
 				if (mode == modes.ALL || mode == modes.LAST_SEEN) {
-					// data.Last_Seen = readstr(read32(rowoffset + lastseen_pos_offset));
 					data.Last_Seen = readstr(read32_row(lastseen_pos_offset, row));
 				}
 			}
 			if (threat_enabled) {
 				if (mode == modes.ALL || mode == modes.THREAT) {
-					// data.Threat = readstr(read32(rowoffset + threat_pos_offset));
 					data.Threat = readstr(read32_row(threat_pos_offset, row));
+				}
+			}
+			if (provider_enabled) {
+				if (mode == modes.ALL || mode == modes.PROVIDER) {
+					data.Provider = readstr(read32_row(provider_pos_offset, row));
 				}
 			}
 			
@@ -564,7 +563,8 @@ function proxyquery(myIP, mode) {
 		"ASN": "?",
 		"AS": "?",
 		"Last_Seen": "?",
-		"Threat": "?"
+		"Threat": "?",
+		"Provider": "?"
 	};
 	
 	if (/^[:0]+:F{4}:(\d+\.){3}\d+$/i.test(myIP)) {
@@ -695,6 +695,11 @@ exports.getThreat = function getThreat(myIP) {
 	return data.Threat;
 }
 
+// Returns a string for the provider
+exports.getProvider = function getProvider(myIP) {
+	data = proxyquery(myIP, modes.PROVIDER);
+	return data.Provider;
+}
 // Returns all results
 exports.getAll = function getAll(myIP) {
 	data = proxyquery(myIP, modes.ALL);

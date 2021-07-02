@@ -26,7 +26,7 @@ Below are the methods supported in this class.
 |---|---|
 |Open|Open the IP2Proxy BIN data for lookup.|
 |Close|Close and clean up the file pointer.|
-|getPackageVersion|Get the package version (1 to 10 for PX1 to PX10 respectively).|
+|getPackageVersion|Get the package version (1 to 11 for PX1 to PX11 respectively).|
 |getModuleVersion|Get the module version.|
 |getDatabaseVersion|Get the database version.|
 |isProxy|Check whether if an IP address was a proxy. Returned value:<ul><li>-1 : errors</li><li>0 : not a proxy</li><li>1 : a proxy</li><li>2 : a data center IP address or search engine robot</li></ul>|
@@ -43,6 +43,7 @@ Below are the methods supported in this class.
 |getAS|Return the autonomous system name of the proxy.|
 |getLastSeen|Return the number of days that the proxy was last seen.|
 |getThreat|Return the threat type of the proxy.|
+|getProvider|Return the provider of the proxy.|
 
 ## Usage
 
@@ -50,7 +51,7 @@ Below are the methods supported in this class.
 
 var ip2proxy = require("ip2proxy-nodejs");
 
-if (ip2proxy.Open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL.BIN") == 0) {
+if (ip2proxy.Open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN") == 0) {
 	ip = '199.83.103.79';
 	
 	console.log("GetModuleVersion: " + ip2proxy.getModuleVersion());
@@ -71,6 +72,7 @@ if (ip2proxy.Open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGET
 	console.log("AS: " + ip2proxy.getAS(ip));
 	console.log("LastSeen: " + ip2proxy.getLastSeen(ip));
 	console.log("Threat: " + ip2proxy.getThreat(ip));
+	console.log("Provider: " + ip2proxy.getProvider(ip));
 	
 	// function for all fields
 	var all = ip2proxy.getAll(ip);
@@ -87,6 +89,7 @@ if (ip2proxy.Open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGET
 	console.log("AS: " + all.AS);
 	console.log("LastSeen: " + all.Last_Seen);
 	console.log("Threat: " + all.Threat);
+	console.log("Provider: " + all.Provider);
 }
 else {
 	console.log("Error reading BIN file.");

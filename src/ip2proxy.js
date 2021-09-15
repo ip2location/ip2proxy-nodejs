@@ -1,707 +1,891 @@
 var net = require("net");
 var fs = require("fs");
 var bigInt = require("big-integer");
+var https = require("https");
 
-var fd;
-
-var version = "3.1.0";
-var binfile = "";
-var IPv4ColumnSize = 0;
-var IPv6ColumnSize = 0;
-var low = 0;
-var high = 0;
-var mid = 0;
-
-var maxindex = 65536;
-var IndexArrayIPv4 = Array(maxindex);
-var IndexArrayIPv6 = Array(maxindex);
-
-var country_pos = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
-var region_pos = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
-var city_pos = [0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5];
-var isp_pos = [0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6];
-var proxytype_pos = [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
-var domain_pos = [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7];
-var usagetype_pos = [0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8];
-var asn_pos = [0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9];
-var as_pos = [0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10];
-var lastseen_pos = [0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11];
-var threat_pos = [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12];
-var provider_pos = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13];
-
-var country_pos_offset = 0;
-var region_pos_offset = 0;
-var city_pos_offset = 0;
-var isp_pos_offset = 0;
-var proxytype_pos_offset = 0;
-var domain_pos_offset = 0;
-var usagetype_pos_offset = 0;
-var asn_pos_offset = 0;
-var as_pos_offset = 0;
-var lastseen_pos_offset = 0;
-var threat_pos_offset = 0;
-var provider_pos_offset = 0;
-
-var country_enabled = 0;
-var region_enabled = 0;
-var city_enabled = 0;
-var isp_enabled = 0;
-var proxytype_enabled = 0;
-var domain_enabled = 0;
-var usagetype_enabled = 0;
-var asn_enabled = 0;
-var as_enabled = 0;
-var lastseen_enabled = 0;
-var threat_enabled = 0;
-var provider_enabled = 0;
-
-var MAX_IPV4_RANGE = bigInt(4294967295);
-var MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
-var FROM_6TO4 = bigInt("42545680458834377588178886921629466624");
-var TO_6TO4 = bigInt("42550872755692912415807417417958686719");
-var FROM_TEREDO = bigInt("42540488161975842760550356425300246528");
-var TO_TEREDO = bigInt("42540488241204005274814694018844196863");
-var LAST_32BITS = bigInt("4294967295");
-
-var mydb = {
-	"_DBType": 0,
-	"_DBColumn": 0,
-	"_DBYear": 0,
-	"_DBMonth": 0,
-	"_DBDay": 0,
-	"_DBCount": 0,
-	"_BaseAddr": 0,
-	"_DBCountIPv6": 0,
-	"_BaseAddrIPv6": 0,
-	"_IndexBaseAddr": 0,
-	"_IndexBaseAddrIPv6": 0,
-	"_ProductCode": 0,
-	"_ProductType": 0,
-	"_FileSize": 0
+// For BIN queries
+const VERSION = "4.0.0";
+const MAX_INDEX = 65536;
+const COUNTRY_POSITION = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+const REGION_POSITION = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
+const CITY_POSITION = [0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5];
+const ISP_POSITION = [0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6, 6];
+const PROXY_TYPE_POSITION = [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+const DOMAIN_POSITION = [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7];
+const USAGE_TYPE_POSITION = [0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8];
+const ASN_POSITION = [0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9];
+const AS_POSITION = [0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10];
+const LAST_SEEN_POSITION = [0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11];
+const THREAT_POSITION = [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12];
+const PROVIDER_POSITION = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13];
+const MAX_IPV4_RANGE = bigInt(4294967295);
+const MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
+const FROM_6TO4 = bigInt("42545680458834377588178886921629466624");
+const TO_6TO4 = bigInt("42550872755692912415807417417958686719");
+const FROM_TEREDO = bigInt("42540488161975842760550356425300246528");
+const TO_TEREDO = bigInt("42540488241204005274814694018844196863");
+const LAST_32_BITS = bigInt("4294967295");
+const MODES = {
+  COUNTRY_SHORT: 1,
+  COUNTRY_LONG: 2,
+  REGION: 3,
+  CITY: 4,
+  ISP: 5,
+  PROXY_TYPE: 6,
+  IS_PROXY: 7,
+  DOMAIN: 8,
+  USAGE_TYPE: 9,
+  ASN: 10,
+  AS: 11,
+  LAST_SEEN: 12,
+  THREAT: 13,
+  PROVIDER: 14,
+  ALL: 100,
 };
+const MSG_NOT_SUPPORTED = "NOT SUPPORTED";
+const MSG_INVALID_IP = "INVALID IP ADDRESS";
+const MSG_MISSING_FILE = "MISSING FILE";
+const MSG_IPV6_UNSUPPORTED = "IPV6 ADDRESS MISSING IN IPV4 BIN";
+const MSG_INVALID_BIN =
+  "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file.";
+const REGEX_TEXT_FIELD = /^(isproxy|ip|ipno)$/i;
+const REGEX_IPV4_1_MATCH = /^[:0]+:F{4}:(\d+\.){3}\d+$/i;
+const REGEX_IPV4_1_REPLACE = /^[:0]+:F{4}:/i;
+const REGEX_IPV4_2_MATCH = /^[:0]+:(\d+\.){3}\d+$/i;
+const REGEX_IPV4_2_REPLACE = /^[:0]+:/i;
 
-var modes = {
-	"COUNTRY_SHORT": 1,
-	"COUNTRY_LONG": 2,
-	"REGION": 3,
-	"CITY": 4,
-	"ISP": 5,
-	"PROXY_TYPE": 6,
-	"IS_PROXY": 7,
-	"DOMAIN": 8,
-	"USAGE_TYPE": 9,
-	"ASN": 10,
-	"AS": 11,
-	"LAST_SEEN": 12,
-	"THREAT": 13,
-	"PROVIDER": 14,
-	"ALL": 100
-};
+// For API queries
+const REGEX_API_KEY = /^[\dA-Z]{10}$/;
+const REGEX_API_PACKAGE = /^PX\d+$/;
+const BASE_URL = "api.ip2proxy.com/";
+const MSG_INVALID_API_KEY = "Invalid API key.";
+const MSG_INVALID_API_PACKAGE = "Invalid package name.";
 
-var MSG_NOT_SUPPORTED = "NOT SUPPORTED";
-var MSG_INVALID_IP = "INVALID IP ADDRESS";
-var MSG_MISSING_FILE = "MISSING FILE";
-var MSG_IPV6_UNSUPPORTED = "IPV6 ADDRESS MISSING IN IPV4 BIN";
-var MSG_INVALID_BIN = "Incorrect IP2Proxy BIN file format. Please make sure that you are using the latest IP2Proxy BIN file.";
+// BIN query class
+class IP2Proxy {
+  #binFile = "";
+  #indexArrayIPV4 = Array(MAX_INDEX);
+  #indexArrayIPV6 = Array(MAX_INDEX);
+  #ipV4ColumnSize = 0;
+  #ipV6ColumnSize = 0;
 
-// Read row data
-function readrow(readbytes, pos) {
-	var buff = new Buffer.alloc(readbytes);
-	totalread = fs.readSync(fd, buff, 0, readbytes, pos - 1);
-	return buff;
-}
+  #countryPositionOffset = 0;
+  #regionPositionOffset = 0;
+  #cityPositionOffset = 0;
+  #ispPositionOffset = 0;
+  #proxyTypePositionOffset = 0;
+  #domainPositionOffset = 0;
+  #usageTypePositionOffset = 0;
+  #asnPositionOffset = 0;
+  #asPositionOffset = 0;
+  #lastSeenPositionOffset = 0;
+  #threatPositionOffset = 0;
+  #providerPositionOffset = 0;
 
-// Read binary data
-function readbin(readbytes, pos, readtype, isbigint) {
-	var buff = new Buffer.alloc(readbytes);
-	totalread = fs.readSync(fd, buff, 0, readbytes, pos);
-	
-	if (totalread == readbytes) {
-		switch (readtype) {
-			case "int8":
-				return buff.readUInt8(0);
-				break;
-			case "int32":
-				return buff.readInt32LE(0);
-				break;
-			case "uint32":
-				return (isbigint) ? bigInt(buff.readUInt32LE(0)) : buff.readUInt32LE(0);
-				break;
-			case "float":
-				return buff.readFloatLE(0);
-				break;
-			case "str":
-				return buff.toString("utf8");
-				break;
-			case "int128":
-				var mybig = bigInt(); // zero
-				var bitshift = 8;
-				for (var x = 0; x < 16; x++) {
-					mybig = mybig.add(bigInt(buff.readUInt8(x)).shiftLeft(bitshift * x));
-				}
-				return mybig;
-				break;
-		}
-	}
-	else {
-		return 0;
-	}
-}
+  #countryEnabled = 0;
+  #regionEnabled = 0;
+  #cityEnabled = 0;
+  #ispEnabled = 0;
+  #proxyTypeEnabled = 0;
+  #domainEnabled = 0;
+  #usageTypeEnabled = 0;
+  #asnEnabled = 0;
+  #asEnabled = 0;
+  #lastSeenEnabled = 0;
+  #threatEnabled = 0;
+  #providerEnabled = 0;
 
-// Read 8 bits integer in the database
-function read8(pos) {
-	readbytes = 1;
-	return readbin(readbytes, pos - 1, "int8");
-}
+  #myDB = {
+    dbType: 0,
+    dbColumn: 0,
+    dbYear: 0,
+    dbMonth: 0,
+    dbDay: 0,
+    dbCount: 0,
+    baseAddress: 0,
+    dbCountIPV6: 0,
+    baseAddressIPV6: 0,
+    indexBaseAddress: 0,
+    indexBaseAddressIPV6: 0,
+    productCode: 0,
+    productType: 0,
+    fileSize: 0,
+  };
+  #fd;
 
-// Read 32 bits integer in the database
-function read32(pos, isbigint) {
-	readbytes = 4;
-	return readbin(readbytes, pos - 1, "uint32", isbigint);
-}
+  constructor() {}
 
-// Read 32 bits integer in the buffer
-function read32_row(pos, buff) {
-	return buff.readUInt32LE(pos);
-}
+  // Read row data
+  readRow(readBytes, position) {
+    let buffer = new Buffer.alloc(readBytes);
+    let totalRead = fs.readSync(this.#fd, buffer, 0, readBytes, position - 1);
+    return buffer;
+  }
 
-// Read 32 bits float in the database
-function readfloat(pos) {
-	readbytes = 4;
-	return readbin(readbytes, pos - 1, "float");
-}
+  // Read binary data
+  readBin(readBytes, position, readType, isBigInt) {
+    let buffer = new Buffer.alloc(readBytes);
+    let totalRead = fs.readSync(this.#fd, buffer, 0, readBytes, position);
 
-// Read 32 bits float in the buffer
-function readfloat_row(pos, buff) {
-	return buff.readFloatLE(pos);
-}
+    if (totalRead == readBytes) {
+      switch (readType) {
+        case "int8":
+          return buffer.readUInt8(0);
+          break;
+        case "int32":
+          return buffer.readInt32LE(0);
+          break;
+        case "uint32":
+          return isBigInt
+            ? bigInt(buffer.readUInt32LE(0))
+            : buffer.readUInt32LE(0);
+          break;
+        case "float":
+          return buffer.readFloatLE(0);
+          break;
+        case "str":
+          return buffer.toString("utf8");
+          break;
+        case "int128":
+          let myBig = bigInt(); // zero
+          let bitShift = 8;
+          for (let x = 0; x < 16; x++) {
+            myBig = myBig.add(
+              bigInt(buffer.readUInt8(x)).shiftLeft(bitShift * x)
+            );
+          }
+          return myBig;
+          break;
+      }
+    } else {
+      return 0;
+    }
+  }
 
-function read32or128(pos, iptype) {
-	if (iptype == 4) {
-		return read32(pos, true); // should be bigInt here already
-	}
-	else if (iptype == 6) {
-		return read128(pos); // only IPv6 will run this; already returning bigInt object
-	}
-	else {
-		return 0;
-	}
-}
+  // Read 8 bits integer in the database
+  read8(position) {
+    let readBytes = 1;
+    return this.readBin(readBytes, position - 1, "int8");
+  }
 
-// Read 128 bits integer in the database
-function read128(pos) {
-	readbytes = 16;
-	return readbin(readbytes, pos - 1, "int128"); // returning bigInt object
-}
+  // Read 32 bits integer in the database
+  read32(position, isBigInt) {
+    let readBytes = 4;
+    return this.readBin(readBytes, position - 1, "uint32", isBigInt);
+  }
 
-// Read strings in the database
-function readstr(pos) {
-	readbytes = 1;
-	return readbin(readbin(readbytes, pos, "int8"), pos + 1, "str");
+  // Read 32 bits integer in the buffer
+  read32Row(position, buffer) {
+    return buffer.readUInt32LE(position);
+  }
+
+  read32Or128(position, ipType) {
+    if (ipType == 4) {
+      return this.read32(position, true);
+    } else if (ipType == 6) {
+      return this.read128(position);
+    } else {
+      return 0;
+    }
+  }
+
+  // Read 128 bits integer in the database
+  read128(position) {
+    let readBytes = 16;
+    return this.readBin(readBytes, position - 1, "int128");
+  }
+
+  // Read strings in the database
+  readStr(position) {
+    let readBytes = 1;
+    return this.readBin(
+      this.readBin(readBytes, position, "int8"),
+      position + 1,
+      "str"
+    );
+  }
+
+  // Read metadata and indexes
+  loadBin() {
+    let loadOK = false;
+
+    try {
+      if (this.#binFile && this.#binFile != "") {
+        this.#fd = fs.openSync(this.#binFile, "r");
+
+        this.#myDB.dbType = this.read8(1);
+        this.#myDB.dbColumn = this.read8(2);
+        this.#myDB.dbYear = this.read8(3);
+        this.#myDB.dbMonth = this.read8(4);
+        this.#myDB.dbDay = this.read8(5);
+        this.#myDB.dbCount = this.read32(6);
+        this.#myDB.baseAddress = this.read32(10);
+        this.#myDB.dbCountIPV6 = this.read32(14);
+        this.#myDB.baseAddressIPV6 = this.read32(18);
+        this.#myDB.indexBaseAddress = this.read32(22);
+        this.#myDB.indexBaseAddressIPV6 = this.read32(26);
+        this.#myDB.productCode = this.read8(30);
+        // below 2 fields just read for now, not being used yet
+        this.#myDB.productType = this.read8(31);
+        this.#myDB.fileSize = this.read32(32);
+
+        // check if is correct BIN (should be 2 for IP2Proxy BIN file), also checking for zipped file (PK being the first 2 chars)
+        if (
+          (this.#myDB.productCode != 2 && this.#myDB.dbYear >= 21) ||
+          (this.#myDB.dbType == 80 && this.#myDB.dbColumn == 75)
+        ) {
+          // only BINs from Jan 2021 onwards have this byte set
+          throw new Error(MSG_INVALID_BIN);
+        }
+
+        this.#ipV4ColumnSize = this.#myDB.dbColumn << 2; // 4 bytes each column
+        this.#ipV6ColumnSize = 16 + ((this.#myDB.dbColumn - 1) << 2); // 4 bytes each column, except IPFrom column which is 16 bytes
+
+        let dbt = this.#myDB.dbType;
+
+        this.#countryPositionOffset =
+          COUNTRY_POSITION[dbt] != 0 ? (COUNTRY_POSITION[dbt] - 2) << 2 : 0;
+        this.#regionPositionOffset =
+          REGION_POSITION[dbt] != 0 ? (REGION_POSITION[dbt] - 2) << 2 : 0;
+        this.#cityPositionOffset =
+          CITY_POSITION[dbt] != 0 ? (CITY_POSITION[dbt] - 2) << 2 : 0;
+        this.#ispPositionOffset =
+          ISP_POSITION[dbt] != 0 ? (ISP_POSITION[dbt] - 2) << 2 : 0;
+        this.#proxyTypePositionOffset =
+          PROXY_TYPE_POSITION[dbt] != 0
+            ? (PROXY_TYPE_POSITION[dbt] - 2) << 2
+            : 0;
+        this.#domainPositionOffset =
+          DOMAIN_POSITION[dbt] != 0 ? (DOMAIN_POSITION[dbt] - 2) << 2 : 0;
+        this.#usageTypePositionOffset =
+          USAGE_TYPE_POSITION[dbt] != 0
+            ? (USAGE_TYPE_POSITION[dbt] - 2) << 2
+            : 0;
+        this.#asnPositionOffset =
+          ASN_POSITION[dbt] != 0 ? (ASN_POSITION[dbt] - 2) << 2 : 0;
+        this.#asPositionOffset =
+          AS_POSITION[dbt] != 0 ? (AS_POSITION[dbt] - 2) << 2 : 0;
+        this.#lastSeenPositionOffset =
+          LAST_SEEN_POSITION[dbt] != 0 ? (LAST_SEEN_POSITION[dbt] - 2) << 2 : 0;
+        this.#threatPositionOffset =
+          THREAT_POSITION[dbt] != 0 ? (THREAT_POSITION[dbt] - 2) << 2 : 0;
+        this.#providerPositionOffset =
+          PROVIDER_POSITION[dbt] != 0 ? (PROVIDER_POSITION[dbt] - 2) << 2 : 0;
+
+        this.#countryEnabled = COUNTRY_POSITION[dbt] != 0 ? 1 : 0;
+        this.#regionEnabled = REGION_POSITION[dbt] != 0 ? 1 : 0;
+        this.#cityEnabled = CITY_POSITION[dbt] != 0 ? 1 : 0;
+        this.#ispEnabled = ISP_POSITION[dbt] != 0 ? 1 : 0;
+        this.#proxyTypeEnabled = PROXY_TYPE_POSITION[dbt] != 0 ? 1 : 0;
+        this.#domainEnabled = DOMAIN_POSITION[dbt] != 0 ? 1 : 0;
+        this.#usageTypeEnabled = USAGE_TYPE_POSITION[dbt] != 0 ? 1 : 0;
+        this.#asnEnabled = ASN_POSITION[dbt] != 0 ? 1 : 0;
+        this.#asEnabled = AS_POSITION[dbt] != 0 ? 1 : 0;
+        this.#lastSeenEnabled = LAST_SEEN_POSITION[dbt] != 0 ? 1 : 0;
+        this.#threatEnabled = THREAT_POSITION[dbt] != 0 ? 1 : 0;
+        this.#providerEnabled = PROVIDER_POSITION[dbt] != 0 ? 1 : 0;
+
+        let pointer = this.#myDB.indexBaseAddress;
+
+        for (let x = 0; x < MAX_INDEX; x++) {
+          this.#indexArrayIPV4[x] = Array(2);
+          this.#indexArrayIPV4[x][0] = this.read32(pointer);
+          this.#indexArrayIPV4[x][1] = this.read32(pointer + 4);
+          pointer += 8;
+        }
+
+        if (this.#myDB.indexBaseAddressIPV6 > 0) {
+          for (let x = 0; x < MAX_INDEX; x++) {
+            this.#indexArrayIPV6[x] = Array(2);
+            this.#indexArrayIPV6[x][0] = this.read32(pointer);
+            this.#indexArrayIPV6[x][1] = this.read32(pointer + 4);
+            pointer += 8;
+          }
+        }
+        loadOK = true;
+      }
+    } catch (err) {
+      // do nothing for now
+    }
+    return loadOK;
+  }
+
+  // Initialize the module with the path to the IP2Proxy BIN file
+  open(binPath) {
+    if (this.#myDB.dbType == 0) {
+      this.#binFile = binPath;
+
+      if (!this.loadBin()) {
+        // problems reading BIN
+        return -1;
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  }
+
+  // Reset everything
+  close() {
+    try {
+      this.#myDB.baseAddress = 0;
+      this.#myDB.dbCount = 0;
+      this.#myDB.dbColumn = 0;
+      this.#myDB.dbType = 0;
+      this.#myDB.dbDay = 0;
+      this.#myDB.dbMonth = 0;
+      this.#myDB.dbYear = 0;
+      this.#myDB.baseAddressIPV6 = 0;
+      this.#myDB.dbCountIPV6 = 0;
+      this.#myDB.indexBaseAddress = 0;
+      this.#myDB.indexBaseAddressIPV6 = 0;
+      this.#myDB.productCode = 0;
+      this.#myDB.productType = 0;
+      this.#myDB.fileSize = 0;
+      fs.closeSync(this.#fd);
+      return 0;
+    } catch (err) {
+      return -1;
+    }
+  }
+
+  // Search BIN for the data
+  proxyQueryData(myIP, ipType, data, mode) {
+    let MAX_IP_RANGE;
+    let low;
+    let mid;
+    let high;
+    let countryPosition;
+    let baseAddress;
+    let columnSize;
+    let ipNumber;
+    let indexAddress;
+    let rowOffset;
+    let rowOffset2;
+    let ipFrom;
+    let ipTo;
+    let firstCol;
+    let row;
+
+    if (ipType == 4) {
+      MAX_IP_RANGE = MAX_IPV4_RANGE;
+      high = this.#myDB.dbCount;
+      baseAddress = this.#myDB.baseAddress;
+      columnSize = this.#ipV4ColumnSize;
+      ipNumber = dot2Num(myIP);
+
+      indexAddress = ipNumber >>> 16;
+      low = this.#indexArrayIPV4[indexAddress][0];
+      high = this.#indexArrayIPV4[indexAddress][1];
+    } else if (ipType == 6) {
+      MAX_IP_RANGE = MAX_IPV6_RANGE;
+      high = this.#myDB.dbCountIPV6;
+      baseAddress = this.#myDB.baseAddressIPV6;
+      columnSize = this.#ipV6ColumnSize;
+      ipNumber = ip2No(myIP);
+
+      if (
+        (ipNumber.geq(FROM_6TO4) && ipNumber.leq(TO_6TO4)) ||
+        (ipNumber.geq(FROM_TEREDO) && ipNumber.leq(TO_TEREDO))
+      ) {
+        ipType = 4;
+        MAX_IP_RANGE = MAX_IPV4_RANGE;
+        high = this.#myDB.dbCount;
+        baseAddress = this.#myDB.baseAddress;
+        columnSize = this.#ipV4ColumnSize;
+
+        if (ipNumber.geq(FROM_6TO4) && ipNumber.leq(TO_6TO4)) {
+          ipNumber = ipNumber.shiftRight(80).and(LAST_32_BITS).toJSNumber();
+        } else {
+          ipNumber = ipNumber.not().and(LAST_32_BITS).toJSNumber();
+        }
+        indexAddress = ipNumber >>> 16;
+        low = this.#indexArrayIPV4[indexAddress][0];
+        high = this.#indexArrayIPV4[indexAddress][1];
+      } else {
+        indexAddress = ipNumber.shiftRight(112).toJSNumber();
+        low = this.#indexArrayIPV6[indexAddress][0];
+        high = this.#indexArrayIPV6[indexAddress][1];
+      }
+    }
+
+    data.ip = myIP;
+    ipNumber = bigInt(ipNumber);
+
+    if (ipNumber.geq(MAX_IP_RANGE)) {
+      ipNumber = MAX_IP_RANGE.minus(1);
+    }
+
+    data.ipNo = ipNumber.toString();
+
+    while (low <= high) {
+      mid = parseInt((low + high) / 2);
+      rowOffset = baseAddress + mid * columnSize;
+      rowOffset2 = rowOffset + columnSize;
+
+      ipFrom = this.read32Or128(rowOffset, ipType);
+      ipTo = this.read32Or128(rowOffset2, ipType);
+
+      ipFrom = bigInt(ipFrom);
+      ipTo = bigInt(ipTo);
+
+      if (ipFrom.leq(ipNumber) && ipTo.gt(ipNumber)) {
+        loadMesg(data, MSG_NOT_SUPPORTED); // load default message
+
+        firstCol = 4;
+        if (ipType == 6) {
+          firstCol = 16;
+        }
+
+        row = this.readRow(columnSize - firstCol, rowOffset + firstCol);
+
+        if (this.#proxyTypeEnabled) {
+          if (
+            mode == MODES.ALL ||
+            mode == MODES.PROXY_TYPE ||
+            mode == MODES.IS_PROXY
+          ) {
+            data.proxyType = this.readStr(
+              this.read32Row(this.#proxyTypePositionOffset, row)
+            );
+          }
+        }
+
+        if (this.#countryEnabled) {
+          if (
+            mode == MODES.ALL ||
+            mode == MODES.COUNTRY_SHORT ||
+            mode == MODES.COUNTRY_LONG ||
+            mode == MODES.IS_PROXY
+          ) {
+            countryPosition = this.read32Row(this.#countryPositionOffset, row);
+          }
+          if (
+            mode == MODES.ALL ||
+            mode == MODES.COUNTRY_SHORT ||
+            mode == MODES.IS_PROXY
+          ) {
+            data.countryShort = this.readStr(countryPosition);
+          }
+          if (mode == MODES.ALL || mode == MODES.COUNTRY_LONG) {
+            data.countryLong = this.readStr(countryPosition + 3);
+          }
+        }
+
+        if (this.#regionEnabled) {
+          if (mode == MODES.ALL || mode == MODES.REGION) {
+            data.region = this.readStr(
+              this.read32Row(this.#regionPositionOffset, row)
+            );
+          }
+        }
+
+        if (this.#cityEnabled) {
+          if (mode == MODES.ALL || mode == MODES.CITY) {
+            data.city = this.readStr(
+              this.read32Row(this.#cityPositionOffset, row)
+            );
+          }
+        }
+        if (this.#ispEnabled) {
+          if (mode == MODES.ALL || mode == MODES.ISP) {
+            data.isp = this.readStr(
+              this.read32Row(this.#ispPositionOffset, row)
+            );
+          }
+        }
+        if (this.#domainEnabled) {
+          if (mode == MODES.ALL || mode == MODES.DOMAIN) {
+            data.domain = this.readStr(
+              this.read32Row(this.#domainPositionOffset, row)
+            );
+          }
+        }
+        if (this.#usageTypeEnabled) {
+          if (mode == MODES.ALL || mode == MODES.USAGE_TYPE) {
+            data.usageType = this.readStr(
+              this.read32Row(this.#usageTypePositionOffset, row)
+            );
+          }
+        }
+        if (this.#asnEnabled) {
+          if (mode == MODES.ALL || mode == MODES.ASN) {
+            data.asn = this.readStr(
+              this.read32Row(this.#asnPositionOffset, row)
+            );
+          }
+        }
+        if (this.#asEnabled) {
+          if (mode == MODES.ALL || mode == MODES.AS) {
+            data.as = this.readStr(this.read32Row(this.#asPositionOffset, row));
+          }
+        }
+        if (this.#lastSeenEnabled) {
+          if (mode == MODES.ALL || mode == MODES.LAST_SEEN) {
+            data.lastSeen = this.readStr(
+              this.read32Row(this.#lastSeenPositionOffset, row)
+            );
+          }
+        }
+        if (this.#threatEnabled) {
+          if (mode == MODES.ALL || mode == MODES.THREAT) {
+            data.threat = this.readStr(
+              this.read32Row(this.#threatPositionOffset, row)
+            );
+          }
+        }
+        if (this.#providerEnabled) {
+          if (mode == MODES.ALL || mode == MODES.PROVIDER) {
+            data.provider = this.readStr(
+              this.read32Row(this.#providerPositionOffset, row)
+            );
+          }
+        }
+
+        if (data.countryShort == "-" || data.proxyType == "-") {
+          data.isProxy = 0;
+        } else {
+          if (data.proxyType == "DCH" || data.proxyType == "SES") {
+            data.isProxy = 2;
+          } else {
+            data.isProxy = 1;
+          }
+        }
+        return;
+      } else {
+        if (ipFrom.gt(ipNumber)) {
+          high = mid - 1;
+        } else {
+          low = mid + 1;
+        }
+      }
+    }
+    loadMesg(data, MSG_INVALID_IP);
+  }
+
+  // Query IP for proxy info
+  proxyQuery(myIP, mode) {
+    let data = {
+      ip: "?",
+      ipNo: "?",
+      isProxy: -1,
+      proxyType: "?",
+      countryShort: "?",
+      countryLong: "?",
+      region: "?",
+      city: "?",
+      isp: "?",
+      domain: "?",
+      usageType: "?",
+      asn: "?",
+      as: "?",
+      lastSeen: "?",
+      threat: "?",
+      provider: "?",
+    };
+
+    if (REGEX_IPV4_1_MATCH.test(myIP)) {
+      myIP = myIP.replace(REGEX_IPV4_1_REPLACE, "");
+    } else if (REGEX_IPV4_2_MATCH.test(myIP)) {
+      myIP = myIP.replace(REGEX_IPV4_2_REPLACE, "");
+    }
+
+    let ipType = net.isIP(myIP);
+
+    if (ipType == 0) {
+      loadMesg(data, MSG_INVALID_IP);
+      return data;
+    } else if (
+      !this.#binFile ||
+      this.#binFile == "" ||
+      !fs.existsSync(this.#binFile)
+    ) {
+      loadMesg(data, MSG_MISSING_FILE);
+      return data;
+    } else if (this.#myDB.dbType == 0) {
+      loadMesg(data, MSG_MISSING_FILE);
+      return data;
+    } else if (ipType == 6 && this.#myDB.dbCountIPV6 == 0) {
+      loadMesg(data, MSG_IPV6_UNSUPPORTED);
+      return data;
+    } else {
+      this.proxyQueryData(myIP, ipType, data, mode);
+      return data;
+    }
+  }
+
+  // Return the module version
+  getModuleVersion() {
+    return VERSION;
+  }
+
+  // Return the package version
+  getPackageVersion() {
+    return this.#myDB.dbType;
+  }
+
+  // Return the IP database version
+  getDatabaseVersion() {
+    return (
+      "20" +
+      this.#myDB.dbYear +
+      "." +
+      this.#myDB.dbMonth +
+      "." +
+      this.#myDB.dbDay
+    );
+  }
+
+  // Return an integer to state if is proxy
+  isProxy(myIP) {
+    // -1 is error
+    // 0 is not a proxy
+    // 1 is proxy except DCH and SES
+    // 2 is proxy and DCH or SES
+    let data = this.proxyQuery(myIP, MODES.IS_PROXY);
+    return data.isProxy;
+  }
+
+  // Return a string for the country code
+  getCountryShort(myIP) {
+    let data = this.proxyQuery(myIP, MODES.COUNTRY_SHORT);
+    return data.countryShort;
+  }
+
+  // Return a string for the country name
+  getCountryLong(myIP) {
+    let data = this.proxyQuery(myIP, MODES.COUNTRY_LONG);
+    return data.countryLong;
+  }
+
+  // Return a string for the region name
+  getRegion(myIP) {
+    let data = this.proxyQuery(myIP, MODES.REGION);
+    return data.region;
+  }
+
+  // Return a string for the city name
+  getCity(myIP) {
+    let data = this.proxyQuery(myIP, MODES.CITY);
+    return data.city;
+  }
+
+  // Return a string for the ISP name
+  getISP(myIP) {
+    let data = this.proxyQuery(myIP, MODES.ISP);
+    return data.isp;
+  }
+
+  // Return a string for the proxy type
+  getProxyType(myIP) {
+    let data = this.proxyQuery(myIP, MODES.PROXY_TYPE);
+    return data.proxyType;
+  }
+
+  // Return a string for the domain
+  getDomain(myIP) {
+    let data = this.proxyQuery(myIP, MODES.DOMAIN);
+    return data.domain;
+  }
+
+  // Return a string for the usage type
+  getUsageType(myIP) {
+    let data = this.proxyQuery(myIP, MODES.USAGE_TYPE);
+    return data.usageType;
+  }
+
+  // Return a string for the ASN
+  getASN(myIP) {
+    let data = this.proxyQuery(myIP, MODES.ASN);
+    return data.asn;
+  }
+
+  // Return a string for the AS
+  getAS(myIP) {
+    let data = this.proxyQuery(myIP, MODES.AS);
+    return data.as;
+  }
+
+  // Return a string for the last seen
+  getLastSeen(myIP) {
+    let data = this.proxyQuery(myIP, MODES.LAST_SEEN);
+    return data.lastSeen;
+  }
+
+  // Return a string for the threat
+  getThreat(myIP) {
+    let data = this.proxyQuery(myIP, MODES.THREAT);
+    return data.threat;
+  }
+
+  // Return a string for the provider
+  getProvider(myIP) {
+    let data = this.proxyQuery(myIP, MODES.PROVIDER);
+    return data.provider;
+  }
+
+  // Return all results
+  getAll(myIP) {
+    let data = this.proxyQuery(myIP, MODES.ALL);
+    return data;
+  }
 }
 
 // Convert IPv4 address to number
-function dot2num(IPv4) {
-	var d = IPv4.split('.');
-	return ((((((+d[0])*256)+(+d[1]))*256)+(+d[2]))*256)+(+d[3]);
+function dot2Num(ipV4) {
+  let d = ipV4.split(".");
+  return ((+d[0] * 256 + +d[1]) * 256 + +d[2]) * 256 + +d[3];
 }
 
 // Convert IPv6 address to number
-function ip2no(IPv6) {
-	var maxsections = 8; // should have 8 sections
-	var sectionbits = 16; // 16 bits per section
-	var m = IPv6.split('::');
-	
-	var total = bigInt(); // zero
-	
-	if (m.length == 2) {
-		var myarrleft = (m[0] != '') ? m[0].split(":") : [];
-		var myarrright = (m[1] != '') ? m[1].split(":") : [];
-		var myarrmid = maxsections - myarrleft.length - myarrright.length;
-		
-		for (var x = 0; x < myarrleft.length; x++) {
-			total = total.add(bigInt(parseInt("0x" + myarrleft[x])).shiftLeft((maxsections - (x + 1)) * sectionbits));
-		}
-		
-		for (var x = 0; x < myarrright.length; x++) {
-			total = total.add(bigInt(parseInt("0x" + myarrright[x])).shiftLeft((myarrright.length - (x + 1)) * sectionbits));
-		}
-	}
-	else if (m.length == 1) {
-		var myarr = m[0].split(":");
-		
-		for (var x = 0; x < myarr.length; x++) {
-			total = total.add(bigInt(parseInt("0x" + myarr[x])).shiftLeft((maxsections - (x + 1)) * sectionbits));
-		}
-	}
-	
-	return total;
+function ip2No(ipV6) {
+  let maxSections = 8; // should have 8 sections
+  let sectionBits = 16; // 16 bits per section
+  let m = ipV6.split("::");
+
+  let total = bigInt(); // zero
+
+  if (m.length == 2) {
+    let myArrLeft = m[0] != "" ? m[0].split(":") : [];
+    let myArrRight = m[1] != "" ? m[1].split(":") : [];
+    let myArrMid = maxSections - myArrLeft.length - myArrRight.length;
+
+    for (let x = 0; x < myArrLeft.length; x++) {
+      total = total.add(
+        bigInt(parseInt("0x" + myArrLeft[x])).shiftLeft(
+          (maxSections - (x + 1)) * sectionBits
+        )
+      );
+    }
+
+    for (let x = 0; x < myArrRight.length; x++) {
+      total = total.add(
+        bigInt(parseInt("0x" + myArrRight[x])).shiftLeft(
+          (myArrRight.length - (x + 1)) * sectionBits
+        )
+      );
+    }
+  } else if (m.length == 1) {
+    let myArr = m[0].split(":");
+
+    for (let x = 0; x < myArr.length; x++) {
+      total = total.add(
+        bigInt(parseInt("0x" + myArr[x])).shiftLeft(
+          (maxSections - (x + 1)) * sectionBits
+        )
+      );
+    }
+  }
+
+  return total;
 }
 
-// Read metadata and indexes
-function loadbin() {
-	var loadok = false;
-	
-	try {
-		if (binfile && (binfile != "")) {
-			fd = fs.openSync(binfile, 'r');
-			
-			mydb._DBType = read8(1);
-			mydb._DBColumn = read8(2);
-			mydb._DBYear = read8(3);
-			mydb._DBMonth = read8(4);
-			mydb._DBDay = read8(5);
-			mydb._DBCount = read32(6);
-			mydb._BaseAddr = read32(10);
-			mydb._DBCountIPv6 = read32(14);
-			mydb._BaseAddrIPv6 = read32(18);
-			mydb._IndexBaseAddr = read32(22);
-			mydb._IndexBaseAddrIPv6 = read32(26);
-			mydb._ProductCode = read8(30);
-			// below 2 fields just read for now, not being used yet
-			mydb._ProductType = read8(31);
-			mydb._FileSize = read32(32);
-			
-			// check if is correct BIN (should be 2 for IP2Proxy BIN file), also checking for zipped file (PK being the first 2 chars)
-			if ((mydb._ProductCode != 2 && mydb._DBYear >= 21) || (mydb._DBType == 80 && mydb._DBColumn == 75)) { // only BINs from Jan 2021 onwards have this byte set
-				throw new Error(MSG_INVALID_BIN);
-			}
-			
-			IPv4ColumnSize = mydb._DBColumn << 2; // 4 bytes each column
-			IPv6ColumnSize = 16 + ((mydb._DBColumn - 1) << 2); // 4 bytes each column, except IPFrom column which is 16 bytes
-			
-			var dbt = mydb._DBType;
-			
-			country_pos_offset = (country_pos[dbt] != 0) ? (country_pos[dbt] - 2) << 2 : 0;
-			region_pos_offset = (region_pos[dbt] != 0) ? (region_pos[dbt] - 2) << 2 : 0;
-			city_pos_offset = (city_pos[dbt] != 0) ? (city_pos[dbt] - 2) << 2 : 0;
-			isp_pos_offset = (isp_pos[dbt] != 0) ? (isp_pos[dbt] - 2) << 2 : 0;
-			proxytype_pos_offset = (proxytype_pos[dbt] != 0) ? (proxytype_pos[dbt] - 2) << 2 : 0;
-			domain_pos_offset = (domain_pos[dbt] != 0) ? (domain_pos[dbt] - 2) << 2 : 0;
-			usagetype_pos_offset = (usagetype_pos[dbt] != 0) ? (usagetype_pos[dbt] - 2) << 2 : 0;
-			asn_pos_offset = (asn_pos[dbt] != 0) ? (asn_pos[dbt] - 2) << 2 : 0;
-			as_pos_offset = (as_pos[dbt] != 0) ? (as_pos[dbt] - 2) << 2 : 0;
-			lastseen_pos_offset = (lastseen_pos[dbt] != 0) ? (lastseen_pos[dbt] - 2) << 2 : 0;
-			threat_pos_offset = (threat_pos[dbt] != 0) ? (threat_pos[dbt] - 2) << 2 : 0;
-			provider_pos_offset = (provider_pos[dbt] != 0) ? (provider_pos[dbt] - 2) << 2 : 0;
-			
-			country_enabled = (country_pos[dbt] != 0) ? 1 : 0;
-			region_enabled = (region_pos[dbt] != 0) ? 1 : 0;
-			city_enabled = (city_pos[dbt] != 0) ? 1 : 0;
-			isp_enabled = (isp_pos[dbt] != 0) ? 1 : 0;
-			proxytype_enabled = (proxytype_pos[dbt] != 0) ? 1 : 0;
-			domain_enabled = (domain_pos[dbt] != 0) ? 1 : 0;
-			usagetype_enabled = (usagetype_pos[dbt] != 0) ? 1 : 0;
-			asn_enabled = (asn_pos[dbt] != 0) ? 1 : 0;
-			as_enabled = (as_pos[dbt] != 0) ? 1 : 0;
-			lastseen_enabled = (lastseen_pos[dbt] != 0) ? 1 : 0;
-			threat_enabled = (threat_pos[dbt] != 0) ? 1 : 0;
-			provider_enabled = (provider_pos[dbt] != 0) ? 1 : 0;
-			
-			var pointer = mydb._IndexBaseAddr;
-			
-			for (var x = 0; x < maxindex; x++) {
-				IndexArrayIPv4[x] = Array(2);
-				IndexArrayIPv4[x][0] = read32(pointer);
-				IndexArrayIPv4[x][1] = read32(pointer + 4);
-				pointer += 8;
-			}
-			
-			if (mydb._IndexBaseAddrIPv6 > 0) {
-				for (var x = 0; x < maxindex; x++) {
-					IndexArrayIPv6[x] = Array(2);
-					IndexArrayIPv6[x][0] = read32(pointer);
-					IndexArrayIPv6[x][1] = read32(pointer + 4);
-					pointer += 8;
-				}
-			}
-			loadok = true;
-		}
-	}
-	catch(err) {
-		// do nothing for now
-	}
-	return loadok;
+function loadMesg(data, mesg) {
+  for (let key in data) {
+    if (REGEX_TEXT_FIELD.test(key) === false) {
+      data[key] = mesg;
+    }
+  }
 }
 
-// Initialize the module with the path to the IP2Proxy BIN file
-exports.Open = function Open(binpath) {
-	if (mydb._DBType == 0) {
-		binfile = binpath;
-		
-		if (!loadbin()) { // problems reading BIN
-			return -1;
-		}
-		else {
-			return 0;
-		}
-	}
-	else {
-		return 0;
-	}
+// API query class
+class IP2ProxyWebService {
+  #apiKey = "";
+  #apiPackage = "";
+  #useSSL = true;
+
+  constructor() {}
+
+  // Set the API key and package to query
+  open(apiKey, apiPackage, useSSL = true) {
+    this.#apiKey = apiKey;
+    this.#apiPackage = apiPackage;
+    this.#useSSL = useSSL;
+
+    this.checkParams();
+  }
+
+  // Validate API key and package
+  checkParams() {
+    if (REGEX_API_KEY.test(this.#apiKey) === false && this.#apiKey != "demo") {
+      throw new Error(MSG_INVALID_API_KEY);
+    }
+
+    if (REGEX_API_PACKAGE.test(this.#apiPackage) === false) {
+      throw new Error(MSG_INVALID_API_PACKAGE);
+    }
+  }
+
+  // Query web service to get proxy information by IP address
+  lookup(myIP, callback) {
+    this.checkParams(); // check here in case user haven't called open yet
+
+    let data = {
+      key: this.#apiKey,
+      package: this.#apiPackage,
+      ip: myIP,
+    };
+
+    let protocol = this.#useSSL ? "https" : "http";
+    let url = protocol + "://" + BASE_URL + "?";
+
+    Object.keys(data).forEach(function (key, index) {
+      if (this[key] != "") {
+        url += key + "=" + encodeURIComponent(this[key]) + "&";
+      }
+    }, data);
+
+    url = url.substring(0, url.length - 1);
+
+    let d = "";
+    let req = https.get(url, function (res) {
+      res.on("data", (chunk) => (d = d + chunk));
+      res.on("end", function () {
+        callback(null, JSON.parse(d));
+      });
+    });
+
+    req.on("error", function (e) {
+      callback(e);
+    });
+  }
+
+  // Check web service credit balance
+  getCredit(callback) {
+    this.checkParams(); // check here in case user haven't called open yet
+
+    let data = {
+      key: this.#apiKey,
+      check: "true",
+    };
+
+    let protocol = this.#useSSL ? "https" : "http";
+    let url = protocol + "://" + BASE_URL + "?";
+
+    Object.keys(data).forEach(function (key, index) {
+      if (this[key] != "") {
+        url += key + "=" + encodeURIComponent(this[key]) + "&";
+      }
+    }, data);
+
+    url = url.substring(0, url.length - 1);
+
+    let d = "";
+    let req = https.get(url, function (res) {
+      res.on("data", (chunk) => (d = d + chunk));
+      res.on("end", function () {
+        callback(null, JSON.parse(d));
+      });
+    });
+
+    req.on("error", function (e) {
+      callback(e);
+    });
+  }
 }
 
-// Resets the module
-exports.Close = function Close() {
-	try {
-		mydb._BaseAddr = 0;
-		mydb._DBCount = 0;
-		mydb._DBColumn = 0;
-		mydb._DBType = 0;
-		mydb._DBDay = 0;
-		mydb._DBMonth = 0;
-		mydb._DBYear = 0;
-		mydb._BaseAddrIPv6 = 0;
-		mydb._DBCountIPv6 = 0;
-		mydb._IndexBaseAddr = 0;
-		mydb._IndexBaseAddrIPv6 = 0;
-		mydb._ProductCode = 0;
-		mydb._ProductType = 0;
-		mydb._FileSize = 0;
-		return 0;
-	}
-	catch(err) {
-		return -1;
-	}
-}
-
-function loadmesg(data, mesg) {
-	for (var key in data) {
-	if (/^(is_proxy|ip|ip_no)$/i.test(key) === false) {
-			data[key] = mesg;
-		}
-	}
-}
-
-function proxyquery_data(myIP, iptype, data, mode) {
-	low = 0;
-	mid = 0;
-	high = 0;
-	countrypos = 0;
-	var MAX_IP_RANGE = bigInt();
-	
-	if (iptype == 4) { // IPv4
-		MAX_IP_RANGE = MAX_IPV4_RANGE;
-		high = mydb._DBCount;
-		_BaseAddr = mydb._BaseAddr;
-		_ColumnSize = IPv4ColumnSize;
-		ipnum = dot2num(myIP);
-		
-		indexaddr = ipnum >>> 16;
-		low = IndexArrayIPv4[indexaddr][0];
-		high = IndexArrayIPv4[indexaddr][1];
-	}
-	else if (iptype == 6) { // IPv6
-		MAX_IP_RANGE = MAX_IPV6_RANGE;
-		high = mydb._DBCountIPv6;
-		_BaseAddr = mydb._BaseAddrIPv6;
-		_ColumnSize = IPv6ColumnSize;
-		ipnum = ip2no(myIP);
-		
-		if ((ipnum.geq(FROM_6TO4) && ipnum.leq(TO_6TO4)) || (ipnum.geq(FROM_TEREDO) && ipnum.leq(TO_TEREDO))) {
-			iptype = 4;
-			MAX_IP_RANGE = MAX_IPV4_RANGE;
-			high = mydb._DBCount;
-			_BaseAddr = mydb._BaseAddr;
-			_ColumnSize = IPv4ColumnSize;
-			
-			if (ipnum.geq(FROM_6TO4) && ipnum.leq(TO_6TO4)) {
-				ipnum = ipnum.shiftRight(80).and(LAST_32BITS).toJSNumber();
-			}
-			else {
-				ipnum = ipnum.not().and(LAST_32BITS).toJSNumber();
-			}
-			indexaddr = ipnum >>> 16;
-			low = IndexArrayIPv4[indexaddr][0];
-			high = IndexArrayIPv4[indexaddr][1];
-		}
-		else {
-			indexaddr = ipnum.shiftRight(112).toJSNumber();
-			low = IndexArrayIPv6[indexaddr][0];
-			high = IndexArrayIPv6[indexaddr][1];
-		}
-	}
-	
-	data.IP = myIP;
-	ipnum = bigInt(ipnum);
-	
-	if (ipnum.geq(MAX_IP_RANGE)) {
-		ipnum = MAX_IP_RANGE.minus(1);
-	}
-	
-	data.IP_No = ipnum.toString();
-		
-	while (low <= high) {
-		mid = parseInt((low + high) / 2);
-		rowoffset = _BaseAddr + (mid * _ColumnSize)
-		rowoffset2 = rowoffset + _ColumnSize
-		
-		var ipfrom = read32or128(rowoffset, iptype);
-		var ipto = read32or128(rowoffset2, iptype);
-		
-		ipfrom = bigInt(ipfrom);
-		ipto = bigInt(ipto);
-		
-		if (ipfrom.leq(ipnum) && ipto.gt(ipnum)) {
-			loadmesg(data, MSG_NOT_SUPPORTED); // load default message
-			
-			var firstcol = 4;
-			if (iptype == 6) { // IPv6
-				firstcol = 16;
-			}
-			
-			var row = readrow(_ColumnSize - firstcol, rowoffset + firstcol);
-			
-			if (proxytype_enabled) {
-				if (mode == modes.ALL || mode == modes.PROXY_TYPE || mode == modes.IS_PROXY) {
-					data.Proxy_Type = readstr(read32_row(proxytype_pos_offset, row));
-				}
-			}
-			
-			if (country_enabled) {
-				if (mode == modes.ALL || mode == modes.COUNTRY_SHORT || mode == modes.COUNTRY_LONG || mode == modes.IS_PROXY) {
-					countrypos = read32_row(country_pos_offset, row);
-				}
-				if (mode == modes.ALL || mode == modes.COUNTRY_SHORT || mode == modes.IS_PROXY) {
-					data.Country_Short = readstr(countrypos);
-				}
-				if (mode == modes.ALL || mode == modes.COUNTRY_LONG) {
-					data.Country_Long = readstr(countrypos + 3);
-				}
-			}
-			
-			if (region_enabled) {
-				if (mode == modes.ALL || mode == modes.REGION) {
-					data.Region = readstr(read32_row(region_pos_offset, row));
-				}
-			}
-			
-			if (city_enabled) {
-				if (mode == modes.ALL || mode == modes.CITY) {
-					data.City = readstr(read32_row(city_pos_offset, row));
-				}
-			}
-			if (isp_enabled) {
-				if (mode == modes.ALL || mode == modes.ISP) {
-					data.ISP = readstr(read32_row(isp_pos_offset, row));
-				}
-			}
-			if (domain_enabled) {
-				if (mode == modes.ALL || mode == modes.DOMAIN) {
-					data.Domain = readstr(read32_row(domain_pos_offset, row));
-				}
-			}
-			if (usagetype_enabled) {
-				if (mode == modes.ALL || mode == modes.USAGE_TYPE) {
-					data.Usage_Type = readstr(read32_row(usagetype_pos_offset, row));
-				}
-			}
-			if (asn_enabled) {
-				if (mode == modes.ALL || mode == modes.ASN) {
-					data.ASN = readstr(read32_row(asn_pos_offset, row));
-				}
-			}
-			if (as_enabled) {
-				if (mode == modes.ALL || mode == modes.AS) {
-					data.AS = readstr(read32_row(as_pos_offset, row));
-				}
-			}
-			if (lastseen_enabled) {
-				if (mode == modes.ALL || mode == modes.LAST_SEEN) {
-					data.Last_Seen = readstr(read32_row(lastseen_pos_offset, row));
-				}
-			}
-			if (threat_enabled) {
-				if (mode == modes.ALL || mode == modes.THREAT) {
-					data.Threat = readstr(read32_row(threat_pos_offset, row));
-				}
-			}
-			if (provider_enabled) {
-				if (mode == modes.ALL || mode == modes.PROVIDER) {
-					data.Provider = readstr(read32_row(provider_pos_offset, row));
-				}
-			}
-			
-			if (data.Country_Short == "-" || data.Proxy_Type == "-") {
-				data.Is_Proxy = 0;
-			}
-			else {
-				if ((data.Proxy_Type == "DCH") || (data.Proxy_Type == "SES")) {
-					data.Is_Proxy = 2;
-				}
-				else {
-					data.Is_Proxy = 1;
-				}
-			}
-			return;
-		}
-		else {
-			if (ipfrom.gt(ipnum)) {
-				high = mid - 1;
-			}
-			else {
-				low = mid + 1;
-			}
-		}
-	}
-	loadmesg(data, MSG_INVALID_IP);
-}
-
-function proxyquery(myIP, mode) {
-	var data = {
-		// "IP": "?",
-		// "IP_No": "?",
-		"Is_Proxy": -1,
-		"Proxy_Type": "?",
-		"Country_Short": "?",
-		"Country_Long": "?",
-		"Region": "?",
-		"City": "?",
-		"ISP": "?",
-		"Domain": "?",
-		"Usage_Type": "?",
-		"ASN": "?",
-		"AS": "?",
-		"Last_Seen": "?",
-		"Threat": "?",
-		"Provider": "?"
-	};
-	
-	if (/^[:0]+:F{4}:(\d+\.){3}\d+$/i.test(myIP)) {
-		myIP = myIP.replace(/^[:0]+:F{4}:/i, '');
-	}
-	else if (/^[:0]+:(\d+\.){3}\d+$/i.test(myIP)) {
-		myIP = myIP.replace(/^[:0]+:/i, '');
-	}
-	
-	iptype = net.isIP(myIP);
-	
-	if (iptype == 0) {
-		loadmesg(data, MSG_INVALID_IP);
-		return data;
-	}
-	else if ((!binfile) || (binfile == "") || (!fs.existsSync(binfile))) {
-		loadmesg(data, MSG_MISSING_FILE);
-		return data;
-	}
-	else if (mydb._DBType == 0) {
-		loadmesg(data, MSG_MISSING_FILE);
-		return data;
-	}
-	else if ((iptype == 6) && (mydb._DBCountIPv6 == 0)) {
-		loadmesg(data, MSG_IPV6_UNSUPPORTED);
-		return data;
-	}
-	else {
-		proxyquery_data(myIP, iptype, data, mode);
-		return data;
-	}
-}
-
-// Returns the module version
-exports.getModuleVersion = function getModuleVersion() {
-	return version;
-}
-
-// Returns the package version
-exports.getPackageVersion = function getPackageVersion() {
-	return mydb._DBType;
-}
-
-// Returns the IP database version
-exports.getDatabaseVersion = function getDatabaseVersion() {
-	return "20" + mydb._DBYear + "." + mydb._DBMonth + "." + mydb._DBDay;
-}
-
-// Returns an integer to state if is proxy
-exports.isProxy = function isProxy(myIP) {
-	// -1 is error
-	// 0 is not a proxy
-	// 1 is proxy except DCH and SES
-	// 2 is proxy and DCH or SES
-	data = proxyquery(myIP, modes.IS_PROXY);
-	return data.Is_Proxy;
-}
-
-// Returns a string for the country code
-exports.getCountryShort = function getCountryShort(myIP) {
-	data = proxyquery(myIP, modes.COUNTRY_SHORT);
-	return data.Country_Short;
-}
-
-// Returns a string for the country name
-exports.getCountryLong = function getCountryLong(myIP) {
-	data = proxyquery(myIP, modes.COUNTRY_LONG);
-	return data.Country_Long;
-}
-
-// Returns a string for the region name
-exports.getRegion = function getRegion(myIP) {
-	data = proxyquery(myIP, modes.REGION);
-	return data.Region;
-}
-
-// Returns a string for the city name
-exports.getCity = function getCity(myIP) {
-	data = proxyquery(myIP, modes.CITY);
-	return data.City;
-}
-
-// Returns a string for the ISP name
-exports.getISP = function getISP(myIP) {
-	data = proxyquery(myIP, modes.ISP);
-	return data.ISP;
-}
-
-// Returns a string for the proxy type
-exports.getProxyType = function getProxyType(myIP) {
-	data = proxyquery(myIP, modes.PROXY_TYPE);
-	return data.Proxy_Type;
-}
-
-// Returns a string for the domain
-exports.getDomain = function getDomain(myIP) {
-	data = proxyquery(myIP, modes.DOMAIN);
-	return data.Domain;
-}
-
-// Returns a string for the usage type
-exports.getUsageType = function getUsageType(myIP) {
-	data = proxyquery(myIP, modes.USAGE_TYPE);
-	return data.Usage_Type;
-}
-
-// Returns a string for the ASN
-exports.getASN = function getASN(myIP) {
-	data = proxyquery(myIP, modes.ASN);
-	return data.ASN;
-}
-
-// Returns a string for the AS
-exports.getAS = function getAS(myIP) {
-	data = proxyquery(myIP, modes.AS);
-	return data.AS;
-}
-
-// Returns a string for the last seen
-exports.getLastSeen = function getLastSeen(myIP) {
-	data = proxyquery(myIP, modes.LAST_SEEN);
-	return data.Last_Seen;
-}
-
-// Returns a string for the threat
-exports.getThreat = function getThreat(myIP) {
-	data = proxyquery(myIP, modes.THREAT);
-	return data.Threat;
-}
-
-// Returns a string for the provider
-exports.getProvider = function getProvider(myIP) {
-	data = proxyquery(myIP, modes.PROVIDER);
-	return data.Provider;
-}
-// Returns all results
-exports.getAll = function getAll(myIP) {
-	data = proxyquery(myIP, modes.ALL);
-	return data;
-}
+module.exports = {
+  IP2Proxy: IP2Proxy,
+  IP2ProxyWebService: IP2ProxyWebService,
+};

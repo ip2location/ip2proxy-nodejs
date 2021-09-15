@@ -113,7 +113,7 @@ Below are the methods supported in this class.
 |---|---|
 |open(apiKey, apiPackage, useSSL = true)| Expects 2 or 3 input parameters:<ol><li>IP2Proxy API Key.</li><li>Package (PX1 - PX11)</li></li><li>Use HTTPS or HTTP</li></ol> |
 |lookup(myIP, callback)|Query IP address. This method returns an object containing the proxy info. <ul><li>countryCode</li><li>countryName</li><li>regionName</li><li>cityName</li><li>isp</li><li>domain</li><li>usageType</li><li>asn</li><li>as</li><li>lastSeen</li><li>threat</li><li>proxyType</li><li>isProxy</li><li>provider</li><ul>|
-|getCredit()|This method returns the web service credit balance in an object.|
+|getCredit(callback)|This method returns the web service credit balance in an object.|
 
 ## Usage
 

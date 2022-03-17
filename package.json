@@ -1,6 +1,6 @@
 {
   "name": "ip2proxy-nodejs",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "IP2Proxy proxy detection component",
   "keywords": [
     "vpn-detection",
@@ -21,9 +21,11 @@
   "files": [
     "src/ip2proxy.js",
     "src/test.js",
+    "src/ip2proxy.d.ts",
     "./README.md"
   ],
   "main": "src/ip2proxy.js",
+  "types": "src/ip2proxy.d.ts",
   "license": "MIT",
   "dependencies": {
     "big-integer": ">=1.6.8"

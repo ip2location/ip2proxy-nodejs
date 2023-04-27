@@ -1,6 +1,6 @@
 {
   "name": "ip2proxy-nodejs",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "description": "IP2Proxy proxy detection component",
   "keywords": [
     "vpn-detection",
@@ -27,9 +27,6 @@
   "main": "src/ip2proxy.js",
   "types": "src/ip2proxy.d.ts",
   "license": "MIT",
-  "dependencies": {
-    "big-integer": ">=1.6.8"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ip2location/ip2proxy-nodejs"

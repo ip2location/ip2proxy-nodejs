@@ -1,10 +1,9 @@
 var net = require("net");
 var fs = require("fs");
-var bigInt = require("big-integer");
 var https = require("https");
 
 // For BIN queries
-const VERSION = "4.2.1";
+const VERSION = "4.2.2";
 const MAX_INDEX = 65536;
 const COUNTRY_POSITION = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 const REGION_POSITION = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
@@ -18,13 +17,13 @@ const AS_POSITION = [0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10];
 const LAST_SEEN_POSITION = [0, 0, 0, 0, 0, 0, 0, 0, 11, 11, 11, 11];
 const THREAT_POSITION = [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12];
 const PROVIDER_POSITION = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13];
-const MAX_IPV4_RANGE = bigInt(4294967295);
-const MAX_IPV6_RANGE = bigInt("340282366920938463463374607431768211455");
-const FROM_6TO4 = bigInt("42545680458834377588178886921629466624");
-const TO_6TO4 = bigInt("42550872755692912415807417417958686719");
-const FROM_TEREDO = bigInt("42540488161975842760550356425300246528");
-const TO_TEREDO = bigInt("42540488241204005274814694018844196863");
-const LAST_32_BITS = bigInt("4294967295");
+const MAX_IPV4_RANGE = BigInt(4294967295);
+const MAX_IPV6_RANGE = BigInt("340282366920938463463374607431768211455");
+const FROM_6TO4 = BigInt("42545680458834377588178886921629466624");
+const TO_6TO4 = BigInt("42550872755692912415807417417958686719");
+const FROM_TEREDO = BigInt("42540488161975842760550356425300246528");
+const TO_TEREDO = BigInt("42540488241204005274814694018844196863");
+const LAST_32_BITS = BigInt("4294967295");
 const MODES = {
   COUNTRY_SHORT: 1,
   COUNTRY_LONG: 2,
@@ -139,7 +138,7 @@ class IP2Proxy {
           break;
         case "uint32":
           return isBigInt
-            ? bigInt(buffer.readUInt32LE(0))
+            ? BigInt(buffer.readUInt32LE(0))
             : buffer.readUInt32LE(0);
           break;
         case "float":
@@ -149,12 +148,11 @@ class IP2Proxy {
           return buffer.toString("utf8");
           break;
         case "int128":
-          let myBig = bigInt(); // zero
+          let myBig = BigInt(0); // zero
           let bitShift = 8;
           for (let x = 0; x < 16; x++) {
-            myBig = myBig.add(
-              bigInt(buffer.readUInt8(x)).shiftLeft(bitShift * x)
-            );
+            myBig =
+              myBig + (BigInt(buffer.readUInt8(x)) << BigInt(bitShift * x));
           }
           return myBig;
           break;
@@ -188,13 +186,12 @@ class IP2Proxy {
 
   // Read 128 bits integer in the buffer
   read128Row(position, buffer) {
-    let myBig = bigInt(); // zero
+    let myBig = BigInt(0); // zero
     let bitShift = 8;
     for (let x = 0; x < 16; x++) {
       let pos = position + x;
-      myBig = myBig.add(
-        bigInt(this.read8Row(pos, buffer)).shiftLeft(bitShift * x)
-      );
+      myBig =
+        myBig + (BigInt(this.read8Row(pos, buffer)) << BigInt(bitShift * x));
     }
     return myBig;
   }
@@ -440,8 +437,8 @@ class IP2Proxy {
       ipNumber = ip2No(myIP);
 
       if (
-        (ipNumber.geq(FROM_6TO4) && ipNumber.leq(TO_6TO4)) ||
-        (ipNumber.geq(FROM_TEREDO) && ipNumber.leq(TO_TEREDO))
+        (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) ||
+        (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO)
       ) {
         ipType = 4;
         MAX_IP_RANGE = MAX_IPV4_RANGE;
@@ -449,10 +446,10 @@ class IP2Proxy {
         baseAddress = this.#myDB.baseAddress;
         columnSize = this.#ipV4ColumnSize;
 
-        if (ipNumber.geq(FROM_6TO4) && ipNumber.leq(TO_6TO4)) {
-          ipNumber = ipNumber.shiftRight(80).and(LAST_32_BITS).toJSNumber();
+        if (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) {
+          ipNumber = Number((ipNumber >> BigInt(80)) & LAST_32_BITS);
         } else {
-          ipNumber = ipNumber.not().and(LAST_32_BITS).toJSNumber();
+          ipNumber = Number(~ipNumber & LAST_32_BITS);
         }
         if (this.#myDB.indexed == 1) {
           indexAddress = ipNumber >>> 16;
@@ -462,7 +459,7 @@ class IP2Proxy {
       } else {
         firstCol = 16; // IPv6 is 16 bytes
         if (this.#myDB.indexedIPV6 == 1) {
-          indexAddress = ipNumber.shiftRight(112).toJSNumber();
+          indexAddress = Number(ipNumber >> BigInt(112));
           low = this.#indexArrayIPV6[indexAddress][0];
           high = this.#indexArrayIPV6[indexAddress][1];
         }
@@ -470,10 +467,10 @@ class IP2Proxy {
     }
 
     data.ip = myIP;
-    ipNumber = bigInt(ipNumber);
+    ipNumber = BigInt(ipNumber);
 
-    if (ipNumber.geq(MAX_IP_RANGE)) {
-      ipNumber = MAX_IP_RANGE.minus(1);
+    if (ipNumber >= MAX_IP_RANGE) {
+      ipNumber = MAX_IP_RANGE - BigInt(1);
     }
 
     data.ipNo = ipNumber.toString();
@@ -488,10 +485,10 @@ class IP2Proxy {
       ipFrom = this.read32Or128Row(0, fullRow, firstCol);
       ipTo = this.read32Or128Row(columnSize, fullRow, firstCol);
 
-      ipFrom = bigInt(ipFrom);
-      ipTo = bigInt(ipTo);
+      ipFrom = BigInt(ipFrom);
+      ipTo = BigInt(ipTo);
 
-      if (ipFrom.leq(ipNumber) && ipTo.gt(ipNumber)) {
+      if (ipFrom <= ipNumber && ipTo >= ipNumber) {
         loadMesg(data, MSG_NOT_SUPPORTED); // load default message
 
         let rowLen = columnSize - firstCol;
@@ -611,7 +608,7 @@ class IP2Proxy {
         }
         return;
       } else {
-        if (ipFrom.gt(ipNumber)) {
+        if (ipFrom > ipNumber) {
           high = mid - 1;
         } else {
           low = mid + 1;
@@ -801,7 +798,7 @@ function ip2No(ipV6) {
   let sectionBits = 16; // 16 bits per section
   let m = ipV6.split("::");
 
-  let total = bigInt(); // zero
+  let total = BigInt(0); // zero
 
   if (m.length == 2) {
     let myArrLeft = m[0] != "" ? m[0].split(":") : [];
@@ -809,29 +806,26 @@ function ip2No(ipV6) {
     let myArrMid = maxSections - myArrLeft.length - myArrRight.length;
 
     for (let x = 0; x < myArrLeft.length; x++) {
-      total = total.add(
-        bigInt(parseInt("0x" + myArrLeft[x])).shiftLeft(
-          (maxSections - (x + 1)) * sectionBits
-        )
-      );
+      total =
+        total +
+        (BigInt(parseInt("0x" + myArrLeft[x])) <<
+          BigInt((maxSections - (x + 1)) * sectionBits));
     }
 
     for (let x = 0; x < myArrRight.length; x++) {
-      total = total.add(
-        bigInt(parseInt("0x" + myArrRight[x])).shiftLeft(
-          (myArrRight.length - (x + 1)) * sectionBits
-        )
-      );
+      total =
+        total +
+        (BigInt(parseInt("0x" + myArrRight[x])) <<
+          BigInt((myArrRight.length - (x + 1)) * sectionBits));
     }
   } else if (m.length == 1) {
     let myArr = m[0].split(":");
 
     for (let x = 0; x < myArr.length; x++) {
-      total = total.add(
-        bigInt(parseInt("0x" + myArr[x])).shiftLeft(
-          (maxSections - (x + 1)) * sectionBits
-        )
-      );
+      total =
+        total +
+        (BigInt(parseInt("0x" + myArr[x])) <<
+          BigInt((maxSections - (x + 1)) * sectionBits));
     }
   }
 

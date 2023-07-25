@@ -3,7 +3,7 @@ var fs = require("fs");
 var https = require("https");
 
 // For BIN queries
-const VERSION = "4.2.2";
+const VERSION = "4.2.3";
 const MAX_INDEX = 65536;
 const COUNTRY_POSITION = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 const REGION_POSITION = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
@@ -488,7 +488,7 @@ class IP2Proxy {
       ipFrom = BigInt(ipFrom);
       ipTo = BigInt(ipTo);
 
-      if (ipFrom <= ipNumber && ipTo >= ipNumber) {
+      if (ipFrom <= ipNumber && ipTo > ipNumber) {
         loadMesg(data, MSG_NOT_SUPPORTED); // load default message
 
         let rowLen = columnSize - firstCol;

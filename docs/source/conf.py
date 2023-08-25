@@ -47,7 +47,6 @@ html_theme_options = {
     "use_download_button": False,
     "use_sidenotes": False,
 }
-}
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.

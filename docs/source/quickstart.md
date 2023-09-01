@@ -74,3 +74,38 @@ else {
 }
 ip2proxy.close();
 ```
+
+You can query the geolocation information asynchronously from the IP2Proxy BIN database as below:
+
+```javascript
+const {IP2Proxy} = require("ip2proxy-nodejs");
+
+let ip2proxy = new IP2Proxy();
+
+ip2proxy.openAsync("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN").then((status) => {
+	if (status == 0) {
+		ip = '199.83.103.79';
+		ip2proxy.getAllAsync(ip).then(all => {
+			console.log("isProxy: " + all.isProxy);
+			console.log("proxyType: " + all.proxyType);
+			console.log("countryShort: " + all.countryShort);
+			console.log("countryLong: " + all.countryLong);
+			console.log("region: " + all.region);
+			console.log("city: " + all.city);
+			console.log("isp: " + all.isp);
+			console.log("domain: " + all.domain);
+			console.log("usagetype: " + all.usageType);
+			console.log("asn: " + all.asn);
+			console.log("as: " + all.as);
+			console.log("lastSeen: " + all.lastSeen);
+			console.log("threat: " + all.threat);
+			console.log("provider: " + all.provider);
+		});
+	}
+	else {
+		console.log("Error reading BIN.");
+	}
+});
+
+```
+

@@ -30,25 +30,41 @@ Below are the methods supported in this class.
 |Method Name|Description|
 |---|---|
 |open|Open the IP2Proxy BIN data for lookup.|
+|openAsync|Open the IP2Proxy BIN data for lookup asynchronously.|
 |close|Close and clean up the file pointer.|
 |getPackageVersion|Get the package version (1 to 11 for PX1 to PX11 respectively).|
 |getModuleVersion|Get the module version.|
 |getDatabaseVersion|Get the database version.|
 |isProxy|Check whether if an IP address was a proxy. Returned value:<ul><li>-1 : errors</li><li>0 : not a proxy</li><li>1 : a proxy</li><li>2 : a data center IP address or search engine robot</li></ul>|
+|isProxyAsync|Check whether if an IP address was a proxy asynchronously. Returned value:<ul><li>-1 : errors</li><li>0 : not a proxy</li><li>1 : a proxy</li><li>2 : a data center IP address or search engine robot</li></ul>|
 |getAll|Return the proxy information in an object.|
+|getAllAsync|Return the proxy information in an object asynchronously.|
 |getProxyType|Return the proxy type. Please visit <a href="https://www.ip2location.com/database/px10-ip-proxytype-country-region-city-isp-domain-usagetype-asn-lastseen-threat-residential" target="_blank">IP2Location</a> for the list of proxy types supported|
+|getProxyTypeAsync|Return the proxy type asynchronously. Please visit <a href="https://www.ip2location.com/database/px10-ip-proxytype-country-region-city-isp-domain-usagetype-asn-lastseen-threat-residential" target="_blank">IP2Location</a> for the list of proxy types supported|
 |getCountryShort|Return the ISO3166-1 country code (2-digits) of the proxy.|
+|getCountryShortAsync|Return the ISO3166-1 country code (2-digits) of the proxy asynchronously.|
 |getCountryLong|Return the ISO3166-1 country name of the proxy.|
+|getCountryLongAsync|Return the ISO3166-1 country name of the proxy asynchronously.|
 |getRegion|Return the ISO3166-2 region name of the proxy. Please visit <a href="https://www.ip2location.com/free/iso3166-2" target="_blank">ISO3166-2 Subdivision Code</a> for the information of ISO3166-2 supported|
+|getRegionAsync|Return the ISO3166-2 region name of the proxy asynchronously. Please visit <a href="https://www.ip2location.com/free/iso3166-2" target="_blank">ISO3166-2 Subdivision Code</a> for the information of ISO3166-2 supported|
 |getCity|Return the city name of the proxy.|
+|getCityAsync|Return the city name of the proxy asynchronously.|
 |getISP|Return the ISP name of the proxy.|
+|getISPAsync|Return the ISP name of the proxy asynchronously.|
 |getDomain|Return the domain name of the proxy.|
+|getDomainAsync|Return the domain name of the proxy asynchronously.|
 |getUsageType|Return the usage type classification of the proxy. Please visit <a href="https://www.ip2location.com/database/px10-ip-proxytype-country-region-city-isp-domain-usagetype-asn-lastseen-threat-residential" target="_blank">IP2Location</a> for the list of usage types supported.|
+|getUsageTypeAsync|Return the usage type classification of the proxy asynchronously. Please visit <a href="https://www.ip2location.com/database/px10-ip-proxytype-country-region-city-isp-domain-usagetype-asn-lastseen-threat-residential" target="_blank">IP2Location</a> for the list of usage types supported.|
 |getASN|Return the autonomous system number of the proxy.|
+|getASNAsync|Return the autonomous system number of the proxy asynchronously.|
 |getAS|Return the autonomous system name of the proxy.|
+|getASAsync|Return the autonomous system name of the proxy asynchronously.|
 |getLastSeen|Return the number of days that the proxy was last seen.|
+|getLastSeenAsync|Return the number of days that the proxy was last seen asynchronously.|
 |getThreat|Return the threat type of the proxy.|
+|getThreatAsync|Return the threat type of the proxy asynchronously.|
 |getProvider|Return the provider of the proxy.|
+|getProviderAsync|Return the provider of the proxy asynchronously.|
 
 ## Usage
 
@@ -101,6 +117,40 @@ else {
 	console.log("Error reading BIN file.");
 }
 ip2proxy.close();
+
+```
+
+## Asynchronously Usage
+
+```javascript
+const {IP2Proxy} = require("ip2proxy-nodejs");
+
+let ip2proxy = new IP2Proxy();
+
+ip2proxy.openAsync("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN").then((status) => {
+	if (status == 0) {
+		ip = '199.83.103.79';
+		ip2proxy.getAllAsync(ip).then(all => {
+			console.log("isProxy: " + all.isProxy);
+			console.log("proxyType: " + all.proxyType);
+			console.log("countryShort: " + all.countryShort);
+			console.log("countryLong: " + all.countryLong);
+			console.log("region: " + all.region);
+			console.log("city: " + all.city);
+			console.log("isp: " + all.isp);
+			console.log("domain: " + all.domain);
+			console.log("usagetype: " + all.usageType);
+			console.log("asn: " + all.asn);
+			console.log("as: " + all.as);
+			console.log("lastSeen: " + all.lastSeen);
+			console.log("threat: " + all.threat);
+			console.log("provider: " + all.provider);
+		});
+	}
+	else {
+		console.log("Error reading BIN.");
+	}
+});
 
 ```
 

@@ -1,9 +1,10 @@
-var net = require("net");
-var fs = require("fs");
-var https = require("https");
+const net = require("net");
+const fs = require("fs");
+const fsp = fs.promises;
+const https = require("https");
 
 // For BIN queries
-const VERSION = "4.2.3";
+const VERSION = "4.3.0";
 const MAX_INDEX = 65536;
 const COUNTRY_POSITION = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 const REGION_POSITION = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
@@ -59,6 +60,19 @@ const REGEX_API_PACKAGE = /^PX\d+$/;
 const BASE_URL = "api.ip2proxy.com/";
 const MSG_INVALID_API_KEY = "Invalid API key.";
 const MSG_INVALID_API_PACKAGE = "Invalid package name.";
+
+// Promise for fs.read since not provided by Node.js
+const readPromise = (...args) => {
+  return new Promise((resolve, reject) => {
+    fs.read(...args, (err, bytesRead, buffer) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ bytesRead: bytesRead, buffer: buffer });
+      }
+    });
+  });
+};
 
 // BIN query class
 class IP2Proxy {
@@ -120,6 +134,18 @@ class IP2Proxy {
   readRow(readBytes, position) {
     let buffer = new Buffer.alloc(readBytes);
     let totalRead = fs.readSync(this.#fd, buffer, 0, readBytes, position - 1);
+    return buffer;
+  }
+
+  // Read row data async
+  async readRowAsync(readBytes, position) {
+    let buffer = new Buffer.alloc(readBytes);
+    var data;
+    try {
+      data = await readPromise(this.#fd, buffer, 0, readBytes, position - 1);
+    } catch (e) {
+      console.error(e);
+    }
     return buffer;
   }
 
@@ -226,6 +252,14 @@ class IP2Proxy {
   readStr(position) {
     let readBytes = 256; // max size of string field + 1 byte for the length
     let row = this.readRow(readBytes, position + 1);
+    let len = this.read8Row(0, row);
+    return row.toString("utf8", 1, len + 1);
+  }
+
+  // Read strings in the database async
+  async readStrAsync(position) {
+    let readBytes = 256; // max size of string field + 1 byte for the length
+    let row = await this.readRowAsync(readBytes, position + 1);
     let len = this.read8Row(0, row);
     return row.toString("utf8", 1, len + 1);
   }
@@ -356,6 +390,133 @@ class IP2Proxy {
     return loadOK;
   }
 
+  // Read metadata and indexes async
+  async loadBinAsync() {
+    let loadOK = false;
+
+    try {
+      if (this.#binFile && this.#binFile != "") {
+        let fh = await fsp.open(this.#binFile, "r");
+        this.#fd = fh.fd;
+
+        let len = 64; // 64-byte header
+        let row = await this.readRowAsync(len, 1);
+
+        this.#myDB.dbType = this.read8Row(0, row);
+        this.#myDB.dbColumn = this.read8Row(1, row);
+        this.#myDB.dbYear = this.read8Row(2, row);
+        this.#myDB.dbMonth = this.read8Row(3, row);
+        this.#myDB.dbDay = this.read8Row(4, row);
+        this.#myDB.dbCount = this.read32Row(5, row);
+        this.#myDB.baseAddress = this.read32Row(9, row);
+        this.#myDB.dbCountIPV6 = this.read32Row(13, row);
+        this.#myDB.baseAddressIPV6 = this.read32Row(17, row);
+        this.#myDB.indexBaseAddress = this.read32Row(21, row);
+        this.#myDB.indexBaseAddressIPV6 = this.read32Row(25, row);
+        this.#myDB.productCode = this.read8Row(29, row);
+        // below 2 fields just read for now, not being used yet
+        this.#myDB.productType = this.read8Row(30, row);
+        this.#myDB.fileSize = this.read32Row(31, row);
+
+        // check if is correct BIN (should be 2 for IP2Proxy BIN file), also checking for zipped file (PK being the first 2 chars)
+        if (
+          (this.#myDB.productCode != 2 && this.#myDB.dbYear >= 21) ||
+          (this.#myDB.dbType == 80 && this.#myDB.dbColumn == 75)
+        ) {
+          // only BINs from Jan 2021 onwards have this byte set
+          throw new Error(MSG_INVALID_BIN);
+        }
+
+        if (this.#myDB.indexBaseAddress > 0) {
+          this.#myDB.indexed = 1;
+        }
+
+        if (this.#myDB.dbCountIPV6 > 0 && this.#myDB.indexBaseAddressIPV6 > 0) {
+          this.#myDB.indexedIPV6 = 1;
+        }
+
+        this.#ipV4ColumnSize = this.#myDB.dbColumn << 2; // 4 bytes each column
+        this.#ipV6ColumnSize = 16 + ((this.#myDB.dbColumn - 1) << 2); // 4 bytes each column, except IPFrom column which is 16 bytes
+
+        let dbt = this.#myDB.dbType;
+
+        this.#countryPositionOffset =
+          COUNTRY_POSITION[dbt] != 0 ? (COUNTRY_POSITION[dbt] - 2) << 2 : 0;
+        this.#regionPositionOffset =
+          REGION_POSITION[dbt] != 0 ? (REGION_POSITION[dbt] - 2) << 2 : 0;
+        this.#cityPositionOffset =
+          CITY_POSITION[dbt] != 0 ? (CITY_POSITION[dbt] - 2) << 2 : 0;
+        this.#ispPositionOffset =
+          ISP_POSITION[dbt] != 0 ? (ISP_POSITION[dbt] - 2) << 2 : 0;
+        this.#proxyTypePositionOffset =
+          PROXY_TYPE_POSITION[dbt] != 0
+            ? (PROXY_TYPE_POSITION[dbt] - 2) << 2
+            : 0;
+        this.#domainPositionOffset =
+          DOMAIN_POSITION[dbt] != 0 ? (DOMAIN_POSITION[dbt] - 2) << 2 : 0;
+        this.#usageTypePositionOffset =
+          USAGE_TYPE_POSITION[dbt] != 0
+            ? (USAGE_TYPE_POSITION[dbt] - 2) << 2
+            : 0;
+        this.#asnPositionOffset =
+          ASN_POSITION[dbt] != 0 ? (ASN_POSITION[dbt] - 2) << 2 : 0;
+        this.#asPositionOffset =
+          AS_POSITION[dbt] != 0 ? (AS_POSITION[dbt] - 2) << 2 : 0;
+        this.#lastSeenPositionOffset =
+          LAST_SEEN_POSITION[dbt] != 0 ? (LAST_SEEN_POSITION[dbt] - 2) << 2 : 0;
+        this.#threatPositionOffset =
+          THREAT_POSITION[dbt] != 0 ? (THREAT_POSITION[dbt] - 2) << 2 : 0;
+        this.#providerPositionOffset =
+          PROVIDER_POSITION[dbt] != 0 ? (PROVIDER_POSITION[dbt] - 2) << 2 : 0;
+
+        this.#countryEnabled = COUNTRY_POSITION[dbt] != 0 ? 1 : 0;
+        this.#regionEnabled = REGION_POSITION[dbt] != 0 ? 1 : 0;
+        this.#cityEnabled = CITY_POSITION[dbt] != 0 ? 1 : 0;
+        this.#ispEnabled = ISP_POSITION[dbt] != 0 ? 1 : 0;
+        this.#proxyTypeEnabled = PROXY_TYPE_POSITION[dbt] != 0 ? 1 : 0;
+        this.#domainEnabled = DOMAIN_POSITION[dbt] != 0 ? 1 : 0;
+        this.#usageTypeEnabled = USAGE_TYPE_POSITION[dbt] != 0 ? 1 : 0;
+        this.#asnEnabled = ASN_POSITION[dbt] != 0 ? 1 : 0;
+        this.#asEnabled = AS_POSITION[dbt] != 0 ? 1 : 0;
+        this.#lastSeenEnabled = LAST_SEEN_POSITION[dbt] != 0 ? 1 : 0;
+        this.#threatEnabled = THREAT_POSITION[dbt] != 0 ? 1 : 0;
+        this.#providerEnabled = PROVIDER_POSITION[dbt] != 0 ? 1 : 0;
+
+        if (this.#myDB.indexed == 1) {
+          len = MAX_INDEX;
+          if (this.#myDB.indexedIPV6 == 1) {
+            len += MAX_INDEX;
+          }
+          len *= 8; // 4 bytes for both From/To
+
+          row = await this.readRowAsync(len, this.#myDB.indexBaseAddress);
+
+          let pointer = 0;
+
+          for (let x = 0; x < MAX_INDEX; x++) {
+            this.#indexArrayIPV4[x] = Array(2);
+            this.#indexArrayIPV4[x][0] = this.read32Row(pointer, row);
+            this.#indexArrayIPV4[x][1] = this.read32Row(pointer + 4, row);
+            pointer += 8;
+          }
+
+          if (this.#myDB.indexedIPV6 == 1) {
+            for (let x = 0; x < MAX_INDEX; x++) {
+              this.#indexArrayIPV6[x] = Array(2);
+              this.#indexArrayIPV6[x][0] = this.read32Row(pointer, row);
+              this.#indexArrayIPV6[x][1] = this.read32Row(pointer + 4, row);
+              pointer += 8;
+            }
+          }
+        }
+        loadOK = true;
+      }
+    } catch (err) {
+      // do nothing for now
+    }
+    return loadOK;
+  }
+
   // Initialize the module with the path to the IP2Proxy BIN file
   open(binPath) {
     if (this.#myDB.dbType == 0) {
@@ -372,7 +533,23 @@ class IP2Proxy {
     }
   }
 
-  // Reset everything
+  // Initialize the module with the path to the IP2Proxy BIN file async
+  async openAsync(binPath) {
+    if (this.#myDB.dbType == 0) {
+      this.#binFile = binPath;
+
+      if (!(await this.loadBinAsync())) {
+        // problems reading BIN
+        return -1;
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  }
+
+  // Reset everything (do not use in async case due to race conditions)
   close() {
     try {
       this.#myDB.baseAddress = 0;
@@ -618,6 +795,228 @@ class IP2Proxy {
     loadMesg(data, MSG_INVALID_IP);
   }
 
+  // Search BIN for the data async
+  async proxyQueryDataAsync(myIP, ipType, data, mode) {
+    let MAX_IP_RANGE;
+    let low;
+    let mid;
+    let high;
+    let countryPosition;
+    let baseAddress;
+    let columnSize;
+    let ipNumber;
+    let indexAddress;
+    let rowOffset;
+    let rowOffset2;
+    let ipFrom;
+    let ipTo;
+    let firstCol = 4; // IP From is 4 bytes
+    let row;
+    let fullRow;
+
+    if (ipType == 4) {
+      MAX_IP_RANGE = MAX_IPV4_RANGE;
+      high = this.#myDB.dbCount;
+      baseAddress = this.#myDB.baseAddress;
+      columnSize = this.#ipV4ColumnSize;
+      ipNumber = dot2Num(myIP);
+
+      if (this.#myDB.indexed == 1) {
+        indexAddress = ipNumber >>> 16;
+        low = this.#indexArrayIPV4[indexAddress][0];
+        high = this.#indexArrayIPV4[indexAddress][1];
+      }
+    } else if (ipType == 6) {
+      MAX_IP_RANGE = MAX_IPV6_RANGE;
+      high = this.#myDB.dbCountIPV6;
+      baseAddress = this.#myDB.baseAddressIPV6;
+      columnSize = this.#ipV6ColumnSize;
+      ipNumber = ip2No(myIP);
+
+      if (
+        (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) ||
+        (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO)
+      ) {
+        ipType = 4;
+        MAX_IP_RANGE = MAX_IPV4_RANGE;
+        high = this.#myDB.dbCount;
+        baseAddress = this.#myDB.baseAddress;
+        columnSize = this.#ipV4ColumnSize;
+
+        if (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) {
+          ipNumber = Number((ipNumber >> BigInt(80)) & LAST_32_BITS);
+        } else {
+          ipNumber = Number(~ipNumber & LAST_32_BITS);
+        }
+        if (this.#myDB.indexed == 1) {
+          indexAddress = ipNumber >>> 16;
+          low = this.#indexArrayIPV4[indexAddress][0];
+          high = this.#indexArrayIPV4[indexAddress][1];
+        }
+      } else {
+        firstCol = 16; // IPv6 is 16 bytes
+        if (this.#myDB.indexedIPV6 == 1) {
+          indexAddress = Number(ipNumber >> BigInt(112));
+          low = this.#indexArrayIPV6[indexAddress][0];
+          high = this.#indexArrayIPV6[indexAddress][1];
+        }
+      }
+    }
+
+    data.ip = myIP;
+    ipNumber = BigInt(ipNumber);
+
+    if (ipNumber >= MAX_IP_RANGE) {
+      ipNumber = MAX_IP_RANGE - BigInt(1);
+    }
+
+    data.ipNo = ipNumber.toString();
+
+    while (low <= high) {
+      mid = Math.trunc((low + high) / 2);
+      rowOffset = baseAddress + mid * columnSize;
+      rowOffset2 = rowOffset + columnSize;
+
+      // reading IP From + whole row + next IP From
+      fullRow = await this.readRowAsync(columnSize + firstCol, rowOffset);
+      ipFrom = this.read32Or128Row(0, fullRow, firstCol);
+      ipTo = this.read32Or128Row(columnSize, fullRow, firstCol);
+
+      ipFrom = BigInt(ipFrom);
+      ipTo = BigInt(ipTo);
+
+      if (ipFrom <= ipNumber && ipTo > ipNumber) {
+        loadMesg(data, MSG_NOT_SUPPORTED); // load default message
+
+        let rowLen = columnSize - firstCol;
+        row = fullRow.subarray(firstCol, firstCol + rowLen); // extract the actual row data
+
+        if (this.#proxyTypeEnabled) {
+          if (
+            mode == MODES.ALL ||
+            mode == MODES.PROXY_TYPE ||
+            mode == MODES.IS_PROXY
+          ) {
+            data.proxyType = await this.readStrAsync(
+              this.read32Row(this.#proxyTypePositionOffset, row)
+            );
+          }
+        }
+
+        if (this.#countryEnabled) {
+          if (
+            mode == MODES.ALL ||
+            mode == MODES.COUNTRY_SHORT ||
+            mode == MODES.COUNTRY_LONG ||
+            mode == MODES.IS_PROXY
+          ) {
+            countryPosition = this.read32Row(this.#countryPositionOffset, row);
+          }
+          if (
+            mode == MODES.ALL ||
+            mode == MODES.COUNTRY_SHORT ||
+            mode == MODES.IS_PROXY
+          ) {
+            data.countryShort = await this.readStrAsync(countryPosition);
+          }
+          if (mode == MODES.ALL || mode == MODES.COUNTRY_LONG) {
+            data.countryLong = await this.readStrAsync(countryPosition + 3);
+          }
+        }
+
+        if (this.#regionEnabled) {
+          if (mode == MODES.ALL || mode == MODES.REGION) {
+            data.region = await this.readStrAsync(
+              this.read32Row(this.#regionPositionOffset, row)
+            );
+          }
+        }
+
+        if (this.#cityEnabled) {
+          if (mode == MODES.ALL || mode == MODES.CITY) {
+            data.city = await this.readStrAsync(
+              this.read32Row(this.#cityPositionOffset, row)
+            );
+          }
+        }
+        if (this.#ispEnabled) {
+          if (mode == MODES.ALL || mode == MODES.ISP) {
+            data.isp = await this.readStrAsync(
+              this.read32Row(this.#ispPositionOffset, row)
+            );
+          }
+        }
+        if (this.#domainEnabled) {
+          if (mode == MODES.ALL || mode == MODES.DOMAIN) {
+            data.domain = await this.readStrAsync(
+              this.read32Row(this.#domainPositionOffset, row)
+            );
+          }
+        }
+        if (this.#usageTypeEnabled) {
+          if (mode == MODES.ALL || mode == MODES.USAGE_TYPE) {
+            data.usageType = await this.readStrAsync(
+              this.read32Row(this.#usageTypePositionOffset, row)
+            );
+          }
+        }
+        if (this.#asnEnabled) {
+          if (mode == MODES.ALL || mode == MODES.ASN) {
+            data.asn = await this.readStrAsync(
+              this.read32Row(this.#asnPositionOffset, row)
+            );
+          }
+        }
+        if (this.#asEnabled) {
+          if (mode == MODES.ALL || mode == MODES.AS) {
+            data.as = await this.readStrAsync(
+              this.read32Row(this.#asPositionOffset, row)
+            );
+          }
+        }
+        if (this.#lastSeenEnabled) {
+          if (mode == MODES.ALL || mode == MODES.LAST_SEEN) {
+            data.lastSeen = await this.readStrAsync(
+              this.read32Row(this.#lastSeenPositionOffset, row)
+            );
+          }
+        }
+        if (this.#threatEnabled) {
+          if (mode == MODES.ALL || mode == MODES.THREAT) {
+            data.threat = await this.readStrAsync(
+              this.read32Row(this.#threatPositionOffset, row)
+            );
+          }
+        }
+        if (this.#providerEnabled) {
+          if (mode == MODES.ALL || mode == MODES.PROVIDER) {
+            data.provider = await this.readStrAsync(
+              this.read32Row(this.#providerPositionOffset, row)
+            );
+          }
+        }
+
+        if (data.countryShort == "-" || data.proxyType == "-") {
+          data.isProxy = 0;
+        } else {
+          if (data.proxyType == "DCH" || data.proxyType == "SES") {
+            data.isProxy = 2;
+          } else {
+            data.isProxy = 1;
+          }
+        }
+        return;
+      } else {
+        if (ipFrom > ipNumber) {
+          high = mid - 1;
+        } else {
+          low = mid + 1;
+        }
+      }
+    }
+    loadMesg(data, MSG_INVALID_IP);
+  }
+
   // Query IP for proxy info
   proxyQuery(myIP, mode) {
     let data = {
@@ -669,6 +1068,57 @@ class IP2Proxy {
     }
   }
 
+  // Query IP for proxy info async
+  async proxyQueryAsync(myIP, mode) {
+    let data = {
+      ip: "?",
+      ipNo: "?",
+      isProxy: -1,
+      proxyType: "?",
+      countryShort: "?",
+      countryLong: "?",
+      region: "?",
+      city: "?",
+      isp: "?",
+      domain: "?",
+      usageType: "?",
+      asn: "?",
+      as: "?",
+      lastSeen: "?",
+      threat: "?",
+      provider: "?",
+    };
+
+    if (REGEX_IPV4_1_MATCH.test(myIP)) {
+      myIP = myIP.replace(REGEX_IPV4_1_REPLACE, "");
+    } else if (REGEX_IPV4_2_MATCH.test(myIP)) {
+      myIP = myIP.replace(REGEX_IPV4_2_REPLACE, "");
+    }
+
+    let ipType = net.isIP(myIP);
+
+    if (ipType == 0) {
+      loadMesg(data, MSG_INVALID_IP);
+      return data;
+    } else if (
+      !this.#binFile ||
+      this.#binFile == "" ||
+      !fs.existsSync(this.#binFile) // don't use async equivalent to test, not recommended by Node.js as it leads to race conditions
+    ) {
+      loadMesg(data, MSG_MISSING_FILE);
+      return data;
+    } else if (this.#myDB.dbType == 0) {
+      loadMesg(data, MSG_MISSING_FILE);
+      return data;
+    } else if (ipType == 6 && this.#myDB.dbCountIPV6 == 0) {
+      loadMesg(data, MSG_IPV6_UNSUPPORTED);
+      return data;
+    } else {
+      await this.proxyQueryDataAsync(myIP, ipType, data, mode);
+      return data;
+    }
+  }
+
   // Return the module version
   getModuleVersion() {
     return VERSION;
@@ -701,9 +1151,25 @@ class IP2Proxy {
     return data.isProxy;
   }
 
+  // Return an integer to state if is proxy async
+  async isProxyAsync(myIP) {
+    // -1 is error
+    // 0 is not a proxy
+    // 1 is proxy except DCH and SES
+    // 2 is proxy and DCH or SES
+    let data = await this.proxyQueryAsync(myIP, MODES.IS_PROXY);
+    return data.isProxy;
+  }
+
   // Return a string for the country code
   getCountryShort(myIP) {
     let data = this.proxyQuery(myIP, MODES.COUNTRY_SHORT);
+    return data.countryShort;
+  }
+
+  // Return a string for the country code async
+  async getCountryShortAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.COUNTRY_SHORT);
     return data.countryShort;
   }
 
@@ -713,9 +1179,21 @@ class IP2Proxy {
     return data.countryLong;
   }
 
+  // Return a string for the country name async
+  async getCountryLongAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.COUNTRY_LONG);
+    return data.countryLong;
+  }
+
   // Return a string for the region name
   getRegion(myIP) {
     let data = this.proxyQuery(myIP, MODES.REGION);
+    return data.region;
+  }
+
+  // Return a string for the region name async
+  async getRegionAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.REGION);
     return data.region;
   }
 
@@ -725,9 +1203,21 @@ class IP2Proxy {
     return data.city;
   }
 
+  // Return a string for the city name async
+  async getCityAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.CITY);
+    return data.city;
+  }
+
   // Return a string for the ISP name
   getISP(myIP) {
     let data = this.proxyQuery(myIP, MODES.ISP);
+    return data.isp;
+  }
+
+  // Return a string for the ISP name async
+  async getISPAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.ISP);
     return data.isp;
   }
 
@@ -737,9 +1227,21 @@ class IP2Proxy {
     return data.proxyType;
   }
 
+  // Return a string for the proxy type async
+  async getProxyTypeAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.PROXY_TYPE);
+    return data.proxyType;
+  }
+
   // Return a string for the domain
   getDomain(myIP) {
     let data = this.proxyQuery(myIP, MODES.DOMAIN);
+    return data.domain;
+  }
+
+  // Return a string for the domain async
+  async getDomainAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.DOMAIN);
     return data.domain;
   }
 
@@ -749,9 +1251,21 @@ class IP2Proxy {
     return data.usageType;
   }
 
+  // Return a string for the usage type async
+  async getUsageTypeAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.USAGE_TYPE);
+    return data.usageType;
+  }
+
   // Return a string for the ASN
   getASN(myIP) {
     let data = this.proxyQuery(myIP, MODES.ASN);
+    return data.asn;
+  }
+
+  // Return a string for the ASN async
+  async getASNAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.ASN);
     return data.asn;
   }
 
@@ -761,9 +1275,21 @@ class IP2Proxy {
     return data.as;
   }
 
+  // Return a string for the AS async
+  async getASAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.AS);
+    return data.as;
+  }
+
   // Return a string for the last seen
   getLastSeen(myIP) {
     let data = this.proxyQuery(myIP, MODES.LAST_SEEN);
+    return data.lastSeen;
+  }
+
+  // Return a string for the last seen async
+  async getLastSeenAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.LAST_SEEN);
     return data.lastSeen;
   }
 
@@ -773,15 +1299,33 @@ class IP2Proxy {
     return data.threat;
   }
 
+  // Return a string for the threat async
+  async getThreatAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.THREAT);
+    return data.threat;
+  }
+
   // Return a string for the provider
   getProvider(myIP) {
     let data = this.proxyQuery(myIP, MODES.PROVIDER);
     return data.provider;
   }
 
+  // Return a string for the provider async
+  async getProviderAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.PROVIDER);
+    return data.provider;
+  }
+
   // Return all results
   getAll(myIP) {
     let data = this.proxyQuery(myIP, MODES.ALL);
+    return data;
+  }
+
+  // Return all results async
+  async getAllAsync(myIP) {
+    let data = await this.proxyQueryAsync(myIP, MODES.ALL);
     return data;
   }
 }

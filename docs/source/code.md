@@ -8,7 +8,14 @@ Construct the IP2Location Class.
 ```{py:function} open(binPath)
 Load the IP2Proxy BIN database for lookup.
 
+
 :param str binPath: (Required) The file path links to IP2Proxy BIN databases.
+```
+
+```{py:function} openAsync(binPath)
+Load the IP2Location BIN database for lookup asynchronously.
+
+:param str binPath: (Required) The file path links to IP2Location BIN databases.
 ```
 
 ```{py:function} getPackageVersion()
@@ -38,6 +45,32 @@ Retrieve geolocation information for an IP address.
 :param string ipAddress: (Required) The IP address (IPv4 or IPv6).
 :return: Returns the geolocation information in array. Refer below table for the fields avaliable in the array
 :rtype: array
+
+**RETURN FIELDS**
+
+| Field Name       | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| countryCode    |     Two-character country code based on ISO 3166. |
+| countryName    |     Country name based on ISO 3166. |
+| regionName     |     Region or state name. |
+| cityName       |     City name. |
+| isp            |     Internet Service Provider or company\'s name. |
+| domain         |     Internet domain name associated with IP address range. |
+| usageType      |     Usage type classification of ISP or company. |
+| asn            |     Autonomous system number (ASN). |
+| as             |     Autonomous system (AS) name. |
+| lastSeen       |     Proxy last seen in days. |
+| threat         |     Security threat reported. |
+| proxyType      |     Type of proxy. |
+| provider       |     Name of VPN provider if available. |
+```
+
+```{py:function} getAllAsync(ipAddress)
+Retrieve geolocation information for an IP address asynchronously.
+
+:param string ipAddress: (Required) The IP address (IPv4 or IPv6).
+:return: Returns the geolocation information in array. Refer below table for the fields avaliable in the array
+:rtype: Promise of an array
 
 **RETURN FIELDS**
 

@@ -120,7 +120,7 @@ ip2proxy.close();
 
 ```
 
-## Asynchronously Usage
+## Asynchronous Usage
 
 ```javascript
 const {IP2Proxy} = require("ip2proxy-nodejs");

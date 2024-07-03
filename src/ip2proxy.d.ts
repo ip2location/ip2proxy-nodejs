@@ -415,7 +415,7 @@ export class IP2Proxy {
      * @param myIP The IP address to query.
      * @returns The promise of the name of the VPN provider.
      */
-    getProviderAsync(myIP: string): Provider<string>;
+    getProviderAsync(myIP: string): Promise<string>;
     /**
      * Returns all fields.
      *

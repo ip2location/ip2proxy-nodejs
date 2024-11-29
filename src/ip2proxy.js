@@ -4,7 +4,7 @@ const fsp = fs.promises;
 const https = require("https");
 
 // For BIN queries
-const VERSION = "4.3.1";
+const VERSION = "4.3.2";
 const MAX_INDEX = 65536;
 const COUNTRY_POSITION = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 const REGION_POSITION = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4];
@@ -25,6 +25,8 @@ const TO_6TO4 = BigInt("42550872755692912415807417417958686719");
 const FROM_TEREDO = BigInt("42540488161975842760550356425300246528");
 const TO_TEREDO = BigInt("42540488241204005274814694018844196863");
 const LAST_32_BITS = BigInt("4294967295");
+const FROM_IPV4_MAPPED_IPV6 = BigInt("281470681743360");
+const TO_IPV4_MAPPED_IPV6 = BigInt("281474976710655");
 const MODES = {
   COUNTRY_SHORT: 1,
   COUNTRY_LONG: 2,
@@ -127,6 +129,7 @@ class IP2Proxy {
     fileSize: 0,
   };
   #fd;
+  #fh;
 
   constructor() {}
 
@@ -396,8 +399,8 @@ class IP2Proxy {
 
     try {
       if (this.#binFile && this.#binFile != "") {
-        let fh = await fsp.open(this.#binFile, "r");
-        this.#fd = fh.fd;
+        this.#fh = await fsp.open(this.#binFile, "r");
+        this.#fd = this.#fh.fd;
 
         let len = 64; // 64-byte header
         let row = await this.readRowAsync(len, 1);
@@ -549,7 +552,7 @@ class IP2Proxy {
     }
   }
 
-  // Reset everything (do not use in async case due to race conditions)
+  // Reset everything
   close() {
     try {
       this.#myDB.baseAddress = 0;
@@ -568,7 +571,33 @@ class IP2Proxy {
       this.#myDB.productCode = 0;
       this.#myDB.productType = 0;
       this.#myDB.fileSize = 0;
-      fs.closeSync(this.#fd);
+      fs.closeSync(this.#fd); // normal file handle
+      return 0;
+    } catch (err) {
+      return -1;
+    }
+  }
+
+  // Reset everything
+  async closeAsync() {
+    try {
+      this.#myDB.baseAddress = 0;
+      this.#myDB.dbCount = 0;
+      this.#myDB.dbColumn = 0;
+      this.#myDB.dbType = 0;
+      this.#myDB.dbDay = 0;
+      this.#myDB.dbMonth = 0;
+      this.#myDB.dbYear = 0;
+      this.#myDB.baseAddressIPV6 = 0;
+      this.#myDB.dbCountIPV6 = 0;
+      this.#myDB.indexed = 0;
+      this.#myDB.indexedIPV6 = 0;
+      this.#myDB.indexBaseAddress = 0;
+      this.#myDB.indexBaseAddressIPV6 = 0;
+      this.#myDB.productCode = 0;
+      this.#myDB.productType = 0;
+      this.#myDB.fileSize = 0;
+      await this.#fh.close(); // FileHandler object opened by fs.Promises
       return 0;
     } catch (err) {
       return -1;
@@ -615,7 +644,8 @@ class IP2Proxy {
 
       if (
         (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) ||
-        (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO)
+        (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO) ||
+        (ipNumber >= FROM_IPV4_MAPPED_IPV6 && ipNumber <= TO_IPV4_MAPPED_IPV6)
       ) {
         ipType = 4;
         MAX_IP_RANGE = MAX_IPV4_RANGE;
@@ -625,8 +655,10 @@ class IP2Proxy {
 
         if (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) {
           ipNumber = Number((ipNumber >> BigInt(80)) & LAST_32_BITS);
-        } else {
+        } else if (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO) {
           ipNumber = Number(~ipNumber & LAST_32_BITS);
+        } else {
+          ipNumber = Number(ipNumber - FROM_IPV4_MAPPED_IPV6);
         }
         if (this.#myDB.indexed == 1) {
           indexAddress = ipNumber >>> 16;
@@ -634,6 +666,10 @@ class IP2Proxy {
           high = this.#indexArrayIPV4[indexAddress][1];
         }
       } else {
+        if (this.#myDB.dbCountIPV6 == 0) {
+          loadMesg(data, MSG_IPV6_UNSUPPORTED);
+          return;
+        }
         firstCol = 16; // IPv6 is 16 bytes
         if (this.#myDB.indexedIPV6 == 1) {
           indexAddress = Number(ipNumber >> BigInt(112));
@@ -835,7 +871,8 @@ class IP2Proxy {
 
       if (
         (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) ||
-        (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO)
+        (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO) ||
+        (ipNumber >= FROM_IPV4_MAPPED_IPV6 && ipNumber <= TO_IPV4_MAPPED_IPV6)
       ) {
         ipType = 4;
         MAX_IP_RANGE = MAX_IPV4_RANGE;
@@ -845,8 +882,10 @@ class IP2Proxy {
 
         if (ipNumber >= FROM_6TO4 && ipNumber <= TO_6TO4) {
           ipNumber = Number((ipNumber >> BigInt(80)) & LAST_32_BITS);
-        } else {
+        } else if (ipNumber >= FROM_TEREDO && ipNumber <= TO_TEREDO) {
           ipNumber = Number(~ipNumber & LAST_32_BITS);
+        } else {
+          ipNumber = Number(ipNumber - FROM_IPV4_MAPPED_IPV6);
         }
         if (this.#myDB.indexed == 1) {
           indexAddress = ipNumber >>> 16;
@@ -854,6 +893,10 @@ class IP2Proxy {
           high = this.#indexArrayIPV4[indexAddress][1];
         }
       } else {
+        if (this.#myDB.dbCountIPV6 == 0) {
+          loadMesg(data, MSG_IPV6_UNSUPPORTED);
+          return;
+        }
         firstCol = 16; // IPv6 is 16 bytes
         if (this.#myDB.indexedIPV6 == 1) {
           indexAddress = Number(ipNumber >> BigInt(112));
@@ -1059,9 +1102,6 @@ class IP2Proxy {
     } else if (this.#myDB.dbType == 0) {
       loadMesg(data, MSG_MISSING_FILE);
       return data;
-    } else if (ipType == 6 && this.#myDB.dbCountIPV6 == 0) {
-      loadMesg(data, MSG_IPV6_UNSUPPORTED);
-      return data;
     } else {
       this.proxyQueryData(myIP, ipType, data, mode);
       return data;
@@ -1109,9 +1149,6 @@ class IP2Proxy {
       return data;
     } else if (this.#myDB.dbType == 0) {
       loadMesg(data, MSG_MISSING_FILE);
-      return data;
-    } else if (ipType == 6 && this.#myDB.dbCountIPV6 == 0) {
-      loadMesg(data, MSG_IPV6_UNSUPPORTED);
       return data;
     } else {
       await this.proxyQueryDataAsync(myIP, ipType, data, mode);

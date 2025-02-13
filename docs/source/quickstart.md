@@ -20,16 +20,16 @@ npm install ip2proxy-nodejs
 
 ## Sample Codes
 
-### Query geolocation information from BIN database
+### Query proxy information from BIN database
 
-You can query the geolocation information from the IP2Proxy BIN database as below:
+You can query the proxy information from the IP2Proxy BIN database as below:
 
 ```javascript
 const {IP2Proxy} = require("ip2proxy-nodejs");
 
 let ip2proxy = new IP2Proxy();
 
-if (ip2proxy.open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN") == 0) {
+if (ip2proxy.open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER-FRAUDSCORE.BIN") == 0) {
 	ip = '199.83.103.79';
 	
 	console.log("GetModuleVersion: " + ip2proxy.getModuleVersion());
@@ -51,6 +51,7 @@ if (ip2proxy.open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGET
 	console.log("LastSeen: " + ip2proxy.getLastSeen(ip));
 	console.log("Threat: " + ip2proxy.getThreat(ip));
 	console.log("Provider: " + ip2proxy.getProvider(ip));
+	console.log("FraudScore: " + ip2proxy.getFraudScore(ip));
 	
 	// function for all fields
 	let all = ip2proxy.getAll(ip);
@@ -68,6 +69,7 @@ if (ip2proxy.open("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGET
 	console.log("lastSeen: " + all.lastSeen);
 	console.log("threat: " + all.threat);
 	console.log("provider: " + all.provider);
+	console.log("fraudScore: " + all.fraudScore);
 }
 else {
 	console.log("Error reading BIN file.");
@@ -75,14 +77,14 @@ else {
 ip2proxy.close();
 ```
 
-You can query the geolocation information asynchronously from the IP2Proxy BIN database as below:
+You can query the proxy information asynchronously from the IP2Proxy BIN database as below:
 
 ```javascript
 const {IP2Proxy} = require("ip2proxy-nodejs");
 
 let ip2proxy = new IP2Proxy();
 
-ip2proxy.openAsync("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN").then((status) => {
+ip2proxy.openAsync("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER-FRAUDSCORE.BIN").then((status) => {
 	if (status == 0) {
 		ip = '199.83.103.79';
 		ip2proxy.getAllAsync(ip).then(all => {
@@ -100,6 +102,7 @@ ip2proxy.openAsync("./IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGE
 			console.log("lastSeen: " + all.lastSeen);
 			console.log("threat: " + all.threat);
 			console.log("provider: " + all.provider);
+			console.log("fraudScore: " + all.fraudScore);
 		});
 	}
 	else {

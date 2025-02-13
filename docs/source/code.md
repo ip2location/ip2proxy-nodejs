@@ -2,7 +2,7 @@
 
 ## IP2Proxy Class
 ```{py:class} IP2Proxy()
-Construct the IP2Location Class.
+Construct the IP2Proxy Class.
 ```
 
 ```{py:function} open(binPath)
@@ -13,13 +13,13 @@ Load the IP2Proxy BIN database for lookup.
 ```
 
 ```{py:function} openAsync(binPath)
-Load the IP2Location BIN database for lookup asynchronously.
+Load the IP2Proxy BIN database for lookup asynchronously.
 
-:param str binPath: (Required) The file path links to IP2Location BIN databases.
+:param str binPath: (Required) The file path links to IP2Proxy BIN databases.
 ```
 
 ```{py:function} getPackageVersion()
-Return the database's type, 1 to 10 respectively for PX1 to PX11. Please visit https://www.ip2location.com/databases/ip2proxy for details.
+Return the database's type, 1 to 12 respectively for PX1 to PX12. Please visit https://www.ip2location.com/databases/ip2proxy for details.
 
 :return: Returns the package version.
 :rtype: string
@@ -63,6 +63,7 @@ Retrieve geolocation information for an IP address.
 | threat         |     Security threat reported. |
 | proxyType      |     Type of proxy. |
 | provider       |     Name of VPN provider if available. |
+| fraudScore     |     Potential risk score (0 - 99) associated with IP address. |
 ```
 
 ```{py:function} getAllAsync(ipAddress)
@@ -89,4 +90,5 @@ Retrieve geolocation information for an IP address asynchronously.
 | threat         |     Security threat reported. |
 | proxyType      |     Type of proxy. |
 | provider       |     Name of VPN provider if available. |
+| fraudScore     |     Potential risk score (0 - 99) associated with IP address. |
 ```

@@ -3,7 +3,7 @@ const {IP2Proxy, IP2ProxyWebService} = require("ip2proxy-nodejs");
 
 let ip2proxy = new IP2Proxy();
 
-ip2proxy.open('PX11.BIN');
+ip2proxy.open('PX12.BIN');
 
 console.log("Module version " + ip2proxy.getModuleVersion());
 console.log("Package version " + ip2proxy.getPackageVersion());
@@ -25,7 +25,7 @@ let ws = new IP2ProxyWebService();
 
 let ip = "8.8.8.8";
 let apiKey = "YOUR_API_KEY";
-let apiPackage = "PX11";
+let apiPackage = "PX12";
 let useSSL = true;
 
 ws.open(apiKey, apiPackage, useSSL);

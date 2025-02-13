@@ -176,6 +176,7 @@ export class IP2Proxy {
         lastSeen: string;
         threat: string;
         provider: string;
+        fraudScore: string;
     };
     /**
      * Performs validations and returns proxy data asynchronously.
@@ -201,6 +202,7 @@ export class IP2Proxy {
         lastSeen: string;
         threat: string;
         provider: string;
+        fraudScore: string;
     }>;
     /**
      * Returns the module version.
@@ -417,6 +419,20 @@ export class IP2Proxy {
      */
     getProviderAsync(myIP: string): Promise<string>;
     /**
+     * Returns the fraud score.
+     *
+     * @param myIP The IP address to query.
+     * @returns The fraud score.
+     */
+    getFraudScore(myIP: string): string;
+    /**
+     * Returns the fraud score asynchronously.
+     *
+     * @param myIP The IP address to query.
+     * @returns The promise of the fraud score.
+     */
+    getFraudScoreAsync(myIP: string): Promise<string>;
+    /**
      * Returns all fields.
      *
      * @param myIP The IP address to query.
@@ -439,6 +455,7 @@ export class IP2Proxy {
         lastSeen: string;
         threat: string;
         provider: string;
+        fraudScore: string;
     };
     /**
      * Returns all fields asynchronously.
@@ -463,6 +480,7 @@ export class IP2Proxy {
         lastSeen: string;
         threat: string;
         provider: string;
+        fraudScore: string;
     }>;
     #private;
 }

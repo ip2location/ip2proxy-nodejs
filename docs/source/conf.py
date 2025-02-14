@@ -4,7 +4,7 @@
 # -- Project information
 
 project = 'IP2Proxy NodeJS'
-copyright = '2024, IP2Location'
+copyright = '2025, IP2Location'
 author = 'IP2Location'
 
 release = '0.1.0'

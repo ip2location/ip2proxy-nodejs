@@ -25,7 +25,7 @@ let ws = new IP2ProxyWebService();
 
 let ip = "8.8.8.8";
 let apiKey = "YOUR_API_KEY";
-let apiPackage = "PX12";
+let apiPackage = "PX11";
 let useSSL = true;
 
 ws.open(apiKey, apiPackage, useSSL);

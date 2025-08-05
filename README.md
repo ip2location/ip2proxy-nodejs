@@ -47,6 +47,7 @@ To learn more about installation, usage, and code examples, please visit the dev
 
 |Threat Type|Description|
 |---|---|
-|SPAM|Spammer|
+|SPAM|Email and forum spammers|
 |SCANNER|Security Scanner or Attack|
 |BOTNET|Spyware or Malware|
+|BOGON|Unassigned or illegitimate IP addresses announced via BGP|

@@ -50,7 +50,7 @@ Retrieve geolocation information for an IP address.
 
 | Field Name       | Description                                                  |
 | ---------------- | ------------------------------------------------------------ |
-| isProxy       |     Determine whether if an IP address was a proxy or not. Returns 0 is not proxy, 1 if proxy, and 2 if it's data center IP |
+| isProxy       |     Determine whether if an IP address was a proxy or not. Returns 0 is not proxy, 1 if proxy, and 2 if it's data center IP or AI crawler |
 | countryCode    |     Two-character country code based on ISO 3166. |
 | countryName    |     Country name based on ISO 3166. |
 | regionName     |     Region or state name. |
@@ -78,7 +78,7 @@ Retrieve geolocation information for an IP address asynchronously.
 
 | Field Name       | Description                                                  |
 | ---------------- | ------------------------------------------------------------ |
-| isProxy        |     Determine whether if an IP address was a proxy or not. Returns 0 is not proxy, 1 if proxy, and 2 if it's data center IP |
+| isProxy        |     Determine whether if an IP address was a proxy or not. Returns 0 is not proxy, 1 if proxy, and 2 if it's data center IP or AI crawler |
 | countryCode    |     Two-character country code based on ISO 3166. |
 | countryName    |     Country name based on ISO 3166. |
 | regionName     |     Region or state name. |

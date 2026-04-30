@@ -226,14 +226,14 @@ export class IP2Proxy {
      * Whether IP is a proxy server.
      *
      * @param myIP The IP address to query.
-     * @returns -1 if error, 0 if not a proxy, 1 if proxy except DCH and SES, 2 if proxy and DCH or SES
+     * @returns -1 if error, 0 if not a proxy, 1 if proxy except DCH and SES and AIC, 2 if proxy and DCH or SES or AIC
      */
     isProxy(myIP: string): number;
     /**
      * Whether IP is a proxy server asynchronously.
      *
      * @param myIP The IP address to query.
-     * @returns Promise of -1 if error, 0 if not a proxy, 1 if proxy except DCH and SES, 2 if proxy and DCH or SES
+     * @returns Promise of -1 if error, 0 if not a proxy, 1 if proxy except DCH and SES and AIC, 2 if proxy and DCH or SES or AIC
      */
     isProxyAsync(myIP: string): Promise<number>;
     /**

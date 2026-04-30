@@ -4,7 +4,7 @@ const fsp = fs.promises;
 const https = require("https");
 
 // For BIN queries
-const VERSION = "4.4.0";
+const VERSION = "4.5.0";
 const MAX_INDEX = 65536;
 const COUNTRY_POSITION = [0, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 const REGION_POSITION = [0, 0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4];
@@ -834,7 +834,7 @@ class IP2Proxy {
         if (data.countryShort == "-" || data.proxyType == "-") {
           data.isProxy = 0;
         } else {
-          if (data.proxyType == "DCH" || data.proxyType == "SES") {
+          if (data.proxyType == "DCH" || data.proxyType == "SES" || data.proxyType == "AIC") {
             data.isProxy = 2;
           } else {
             data.isProxy = 1;
@@ -1070,7 +1070,7 @@ class IP2Proxy {
         if (data.countryShort == "-" || data.proxyType == "-") {
           data.isProxy = 0;
         } else {
-          if (data.proxyType == "DCH" || data.proxyType == "SES") {
+          if (data.proxyType == "DCH" || data.proxyType == "SES" || data.proxyType == "AIC") {
             data.isProxy = 2;
           } else {
             data.isProxy = 1;
@@ -1212,8 +1212,8 @@ class IP2Proxy {
   isProxy(myIP) {
     // -1 is error
     // 0 is not a proxy
-    // 1 is proxy except DCH and SES
-    // 2 is proxy and DCH or SES
+    // 1 is proxy except DCH and SES and AIC
+    // 2 is proxy and DCH or SES or AIC
     let data = this.proxyQuery(myIP, MODES.IS_PROXY);
     return data.isProxy;
   }
@@ -1222,8 +1222,8 @@ class IP2Proxy {
   async isProxyAsync(myIP) {
     // -1 is error
     // 0 is not a proxy
-    // 1 is proxy except DCH and SES
-    // 2 is proxy and DCH or SES
+    // 1 is proxy except DCH and SES and AIC
+    // 2 is proxy and DCH or SES or AIC
     let data = await this.proxyQueryAsync(myIP, MODES.IS_PROXY);
     return data.isProxy;
   }
